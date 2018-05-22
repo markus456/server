@@ -7217,7 +7217,7 @@ int spider_mysql_handler::append_select(
     if (result_list->lock_type != F_WRLCK && spider->lock_mode < 1)
     {
       /* no lock */
-      st_select_lex *select_lex = &spider->trx->thd->lex->select_lex;
+      st_select_lex *select_lex = spider->trx->thd->lex->first_select_lex();
       if (
         select_lex->sql_cache == SELECT_LEX::SQL_CACHE &&
         (spider->share->query_cache_sync & 1)

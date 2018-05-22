@@ -1417,7 +1417,7 @@ bool st_select_lex_unit::exec()
         union_result->change_select();
       if (fake_select_lex)
       {
-        if (sl != &thd->lex->select_lex)
+        if (sl != thd->lex->first_select_lex())
           fake_select_lex->uncacheable|= sl->uncacheable;
         else
           fake_select_lex->uncacheable= 0;

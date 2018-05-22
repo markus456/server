@@ -833,12 +833,12 @@ drop view v4, v3, v2, v1;
 #
 # VIEW over SELECT with prohibited clauses
 #
--- error ER_PARSE_ERROR
+-- error ER_CANT_USE_OPTION_HERE
 create view v1 as select 5 into @w;
--- error ER_PARSE_ERROR
+-- error ER_CANT_USE_OPTION_HERE
 create view v1 as select 5 into outfile 'ttt';
 create table t1 (a int);
--- error ER_PARSE_ERROR
+-- error ER_CANT_USE_OPTION_HERE
 create view v1 as select a from t1 procedure analyse();
 # now derived tables are allowed
 create view v1 as select 1 from (select 1) as d1;
@@ -3109,7 +3109,7 @@ DROP VIEW IF EXISTS v1;
 let $query = SELECT * FROM (SELECT 1) AS t into @w;
 
 eval $query;
---error ER_PARSE_ERROR
+--error ER_CANT_USE_OPTION_HERE
 eval CREATE VIEW v1 AS $query;
 --echo # Previously the following would fail.
 eval $query;
@@ -4042,7 +4042,7 @@ CREATE OR REPLACE view v1 AS
 ;
 
 SELECT 1
-FROM ((  SELECT 1
+FROM (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4050,8 +4050,8 @@ FROM ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t1)
-LEFT OUTER JOIN ((  SELECT 1
+) t1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4059,8 +4059,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t2) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t2 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4068,8 +4068,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t3) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t3 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4077,8 +4077,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t4) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t4 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4086,8 +4086,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t5) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t5 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4095,8 +4095,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t6) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t6 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4104,8 +4104,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t7) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t7 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4113,18 +4113,18 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t8) ON 1=1
+) t8 ON 1=1
 ;
 
 SELECT 1
-FROM (v1 t1)
-LEFT OUTER JOIN (v1 t2) ON 1=1
-LEFT OUTER JOIN (v1 t3) ON 1=1
-LEFT OUTER JOIN (v1 t4) ON 1=1
-LEFT OUTER JOIN (v1 t5) ON 1=1
-LEFT OUTER JOIN (v1 t6) ON 1=1
-LEFT OUTER JOIN (v1 t7) ON 1=1
-LEFT OUTER JOIN (v1 t8) ON 1=1
+FROM v1 t1
+LEFT OUTER JOIN v1 t2 ON 1=1
+LEFT OUTER JOIN v1 t3 ON 1=1
+LEFT OUTER JOIN v1 t4 ON 1=1
+LEFT OUTER JOIN v1 t5 ON 1=1
+LEFT OUTER JOIN v1 t6 ON 1=1
+LEFT OUTER JOIN v1 t7 ON 1=1
+LEFT OUTER JOIN v1 t8 ON 1=1
 ;
 
 drop view v1;

@@ -266,7 +266,7 @@ CREATE TABLE t1 (f1 BIGINT) ;
 
 # SELECT INTO is illegal
 SET @x=0;
---error ER_PARSE_ERROR
+--error ER_CANT_USE_OPTION_HERE
 CREATE or REPLACE VIEW v1 AS Select 1 INTO @x;
 Select @x;
 

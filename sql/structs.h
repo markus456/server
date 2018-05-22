@@ -754,6 +754,60 @@ public:
 };
 
 
+class Lex_select_lock
+{
+public:
+  struct
+  {
+    uint defined_lock:1;
+    uint update_lock:1;
+    uint defined_timeout:1;
+  };
+  ulong timeout;
+
+
+  void empty()
+  {
+    defined_lock= update_lock= defined_timeout= FALSE;
+    timeout= 0;
+  }
+};
+
+class Lex_select_limit
+{
+public:
+  bool explicit_limit;
+  Item *select_limit, *offset_limit;
+
+  void empty()
+  {
+    explicit_limit= FALSE;
+    select_limit= offset_limit= NULL;
+  }
+};
+
+struct st_order;
+class st_select_lex;
+
+/**
+  ORDER BY ... LIMIT parameters;
+*/
+class Lex_order_limit_lock
+{
+public:
+  SQL_I_List<st_order> *order_list;   /* ORDER clause */
+  Lex_select_lock lock;
+  Lex_select_limit limit;
+
+  static void *operator new(size_t size, MEM_ROOT *mem_root) throw ()
+  { return alloc_root(mem_root, size); }
+  Lex_order_limit_lock() :order_list(NULL)
+  {}
+
+  bool set_to(st_select_lex *sel);
+};
+
+
 class Load_data_param
 {
 protected:

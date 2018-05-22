@@ -734,7 +734,8 @@ Item_ident::Item_ident(THD *thd, TABLE_LIST *view_arg,
   :Item_result_field(thd), orig_db_name(NullS),
    orig_table_name(view_arg->table_name.str),
    orig_field_name(*field_name_arg),
-   context(&view_arg->view->select_lex.context),
+   /* TODO: suspicious use of first_select_lex */
+   context(&view_arg->view->first_select_lex()->context),
    db_name(NullS), table_name(view_arg->alias.str),
    field_name(*field_name_arg),
    alias_name_used(FALSE), cached_field_index(NO_CACHED_FIELD_INDEX),
@@ -3095,7 +3096,10 @@ Item_field::Item_field(THD *thd, Field *f)
    have_privileges(0), any_privileges(0)
 {
   set_field(f);
-
+  /*
+    field_name and table_name should not point to garbage
+    if this item is to be reused
+  */
   orig_table_name= table_name;
   orig_field_name= field_name;
   with_field= 1;

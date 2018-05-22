@@ -4608,6 +4608,7 @@ public:
   TMP_TABLE_SHARE* save_tmp_table_share(TABLE *table);
   void restore_tmp_table_share(TMP_TABLE_SHARE *share);
 
+  bool inline is_main_lex(LEX *lex) { return lex == &main_lex; }
 private:
   /* Whether a lock has been acquired? */
   bool m_tmp_tables_locked;
@@ -4777,7 +4778,7 @@ public:
   /**
     Switch to a sublex, to parse a substatement or an expression.
   */
-  void set_local_lex(sp_lex_local *sublex)
+  void set_local_lex(sp_lex_local *sublex, LEX *stmtlex)
   {
     DBUG_ASSERT(lex->sphead);
     lex= sublex;
@@ -6188,7 +6189,8 @@ public:
 
 inline bool add_item_to_list(THD *thd, Item *item)
 {
-  return thd->lex->current_select->add_item_to_list(thd, item);
+  bool res= thd->lex->current_select->add_item_to_list(thd, item);
+  return res;
 }
 
 inline bool add_value_to_list(THD *thd, Item *value)

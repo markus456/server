@@ -290,7 +290,7 @@ sp_get_flags_for_command(LEX *lex)
        - EXPLAIN DELETE ...
        - ANALYZE DELETE ...
     */
-    if (lex->select_lex.item_list.is_empty() &&
+    if (lex->first_select_lex()->item_list.is_empty() &&
         !lex->describe && !lex->analyze_stmt)
       flags= 0;
     else
@@ -2264,6 +2264,7 @@ sp_head::execute_procedure(THD *thd, List<Item> *args)
   if (!err_status)
   {
     err_status= execute(thd, TRUE);
+    DBUG_PRINT("info", ("execute returned %d", (int) err_status));
   }
 
   if (save_log_general)
@@ -2366,7 +2367,7 @@ sp_head::reset_lex(THD *thd, sp_lex_local *sublex)
   DBUG_ENTER("sp_head::reset_lex");
   LEX *oldlex= thd->lex;
 
-  thd->set_local_lex(sublex);
+  thd->set_local_lex(sublex, sublex);
 
   DBUG_RETURN(m_lex.push_front(oldlex));
 }
