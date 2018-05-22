@@ -6041,10 +6041,17 @@ bool LEX::sp_for_loop_implicit_cursor_statement(THD *thd,
   bounds->m_index->sp_lex_in_use= true;
   sphead->reset_lex(thd, bounds->m_index);
   DBUG_ASSERT(thd->lex != this);
-  if (unlikely(!(item=
-                 new (thd->mem_root) Item_field(thd,
-                                                thd->lex->current_context(),
-                                                NullS, NullS, &name))))
+  /*
+    We pass NULL as Name_resolution_context here.
+    It's OK, fix_fields() will not be called for this Item_field created.
+    Item_field is only needed for LEX::sp_for_loop_cursor_declarations()
+    and is used to transfer the loop index variable name, "rec" in this example:
+      FOR rec IN (SELECT * FROM t1)
+      DO
+        SELECT rec.a, rec.b;
+      END FOR;
+  */
+  if (!(item= new (thd->mem_root) Item_field(thd, NULL, NullS, NullS, &name)))
     return true;
   bounds->m_index->set_item_and_free_list(item, NULL);
   if (thd->lex->sphead->restore_lex(thd))
@@ -6151,10 +6158,22 @@ bool LEX::sp_for_loop_intrange_declarations(THD *thd, Lex_for_loop_st *loop,
                                             const LEX_CSTRING *index,
                                             const Lex_for_loop_bounds_st &bounds)
 {
-  if (unlikely(!(loop->m_index=
-                 bounds.m_index->
-                 sp_add_for_loop_variable(thd, index,
-                                          bounds.m_index->get_item()))))
+  Item *item;
+  if ((item= bounds.m_index->get_item())->type() == Item::FIELD_ITEM)
+  {
+    // We're here is the lower bound is unknown identifier
+    my_error(ER_SP_UNDECLARED_VAR, MYF(0), item->full_name());
+    return true;
+  }
+  if ((item= bounds.m_upper_bound->get_item())->type() == Item::FIELD_ITEM)
+  {
+    // We're here is the upper bound is unknown identifier
+    my_error(ER_SP_UNDECLARED_VAR, MYF(0), item->full_name());
+    return true;
+  }
+  if (!(loop->m_index=
+        bounds.m_index->sp_add_for_loop_variable(thd, index,
+                                                 bounds.m_index->get_item())))
     return true;
   if (unlikely(!(loop->m_upper_bound=
                  bounds.m_upper_bound->
@@ -7078,6 +7097,38 @@ bool LEX::add_resignal_statement(THD *thd, const sp_condition_value *v)
 }
 
 
+/*
+  Make an Item when an identifier is found in the FOR loop bounds:
+    FOR rec IN cursor
+    FOR var IN var1 .. xxx
+    FOR var IN row1.field1 .. xxx
+  When we parse the first expression after the "IN" keyword,
+  we don't know yet if it's a cursor name, or a scalar SP variable name,
+  or a field of a ROW SP variable. Here we create Item_field to remember
+  the fully qualified name. Later sp_for_loop_cursor_declarations()
+  detects how to treat this name properly.
+*/
+Item *LEX::create_item_for_loop_bound(THD *thd,
+                                      const LEX_CSTRING *a,
+                                      const LEX_CSTRING *b,
+                                      const LEX_CSTRING *c)
+{
+  /*
+    Pass NULL as the name resolution context.
+    This is OK, fix_fields() won't be called for this Item_field.
+  */
+  return new (thd->mem_root) Item_field(thd, NULL, a->str, b->str, c);
+}
+
+
+bool LEX::check_expr_allows_fields_or_error(THD *thd, const char *name) const
+{
+  if (select_stack_top > 0)
+    return false; // OK, fields are allowed
+  my_error(ER_BAD_FIELD_ERROR, MYF(0), name, thd->where);
+  return true;    // Error, fields are not allowed
+}
+
 Item *LEX::create_item_ident_nospvar(THD *thd,
                                      const Lex_ident_sys_st *a,
                                      const Lex_ident_sys_st *b)
@@ -7100,12 +7151,11 @@ Item *LEX::create_item_ident_nospvar(THD *thd,
     my_error(ER_TABLENAME_NOT_ALLOWED_HERE, MYF(0), a->str, thd->where);
     return NULL;
   }
-  if ((current_select->parsing_place != IN_HAVING) ||
-      (current_select->get_in_sum_expr() > 0))
-    return new (thd->mem_root) Item_field(thd, current_context(),
-                                          NullS, a->str, b);
-  return new (thd->mem_root) Item_ref(thd, current_context(),
-                                      NullS, a->str, b);
+
+  if (current_select->parsing_place == FOR_LOOP_BOUND)
+    return create_item_for_loop_bound(thd, &null_clex_str, a, b);
+
+  return create_item_ident_field(thd, NullS, a->str, b);
 }
 
 
@@ -7317,12 +7367,11 @@ Item *LEX::create_item_ident(THD *thd,
     my_error(ER_TABLENAME_NOT_ALLOWED_HERE, MYF(0), b->str, thd->where);
     return NULL;
   }
-  if (current_select->parsing_place != IN_HAVING ||
-      current_select->get_in_sum_expr() > 0)
-    return new (thd->mem_root) Item_field(thd, current_context(),
-                                          schema, b->str, c);
-  return new (thd->mem_root) Item_ref(thd, current_context(),
-                                      schema, b->str, c);
+
+  if (current_select->parsing_place == FOR_LOOP_BOUND)
+    return create_item_for_loop_bound(thd, &null_clex_str, b, c);
+
+  return create_item_ident_field(thd, schema, b->str, c);
 }
 
 
@@ -7408,15 +7457,20 @@ bool LEX::set_user_variable(THD *thd, const LEX_CSTRING *name, Item *val)
 }
 
 
-Item *LEX::create_item_ident_nosp(THD *thd, Lex_ident_sys_st *name)
+Item *LEX::create_item_ident_field(THD *thd, const char *db,
+                                   const char *table,
+                                   const Lex_ident_sys_st *name)
 {
+  if (check_expr_allows_fields_or_error(thd, name->str))
+    return NULL;
+
   if (current_select->parsing_place != IN_HAVING ||
       current_select->get_in_sum_expr() > 0)
     return new (thd->mem_root) Item_field(thd, current_context(),
-                                          NullS, NullS, name);
+                                          db, table, name);
 
   return new (thd->mem_root) Item_ref(thd, current_context(),
-                                      NullS, NullS, name);
+                                      db, table, name);
 }
 
 
@@ -7466,6 +7520,11 @@ Item *LEX::create_item_ident_sp(THD *thd, Lex_ident_sys_st *name,
     if (lex_string_eq(name, STRING_WITH_LEN("SQLERRM")))
       return new (thd->mem_root) Item_func_sqlerrm(thd);
   }
+
+  if (current_select->parsing_place == FOR_LOOP_BOUND)
+    return create_item_for_loop_bound(thd, &null_clex_str, &null_clex_str,
+                                      name);
+
   return create_item_ident_nosp(thd, name);
 }
 
@@ -9042,4 +9101,30 @@ bool LEX::insert_select_hack(SELECT_LEX *sel)
   };
 
   DBUG_RETURN(FALSE);
+}
+
+
+/*
+  Create an Item_singlerow_subselect for a query expression.
+*/
+Item *LEX::create_item_query_expression(THD *thd,
+                                        const char *tok_start,
+                                        st_select_lex_unit *unit)
+{
+  if (!expr_allows_subselect || sql_command == SQLCOM_PURGE)
+  {
+    thd->parse_error(ER_SYNTAX_ERROR, tok_start);
+    return NULL;
+  }
+
+  // Add the subtree of subquery to the current SELECT_LEX
+  SELECT_LEX *curr_sel= select_stack_head();
+  DBUG_ASSERT(current_select == curr_sel);
+  if (!curr_sel)
+    curr_sel= &builtin_select;
+  curr_sel->register_unit(unit, &curr_sel->context);
+  curr_sel->add_statistics(unit);
+
+  return new (thd->mem_root)
+    Item_singlerow_subselect(thd, unit->first_select());
 }

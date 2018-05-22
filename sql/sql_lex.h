@@ -701,6 +701,7 @@ public:
   }
 
   inline st_select_lex_node* get_master() { return master; }
+  inline st_select_lex_node* get_slave() { return slave; }
   void include_down(st_select_lex_node *upper);
   void add_slave(st_select_lex_node *slave_arg);
   void include_neighbour(st_select_lex_node *before);
@@ -1217,6 +1218,10 @@ public:
   inline void set_master_unit(st_select_lex_unit *master_unit)
   {
     master= (st_select_lex_node *)master_unit;
+  }
+  void set_master(st_select_lex *master_arg)
+  {
+    master= master_arg;
   }
   st_select_lex_unit* first_inner_unit() 
   { 
@@ -2978,6 +2983,12 @@ private:
   bool sp_for_loop_condition(THD *thd, const Lex_for_loop_st &loop);
   bool sp_for_loop_increment(THD *thd, const Lex_for_loop_st &loop);
 
+  /*
+    Check if Item_field and Item_ref are allowed in the current statement.
+    @retval false OK (fields are allowed)
+    @retval true  ERROR (fields are not allowed). Error is raised.
+  */
+  bool check_expr_allows_fields_or_error(THD *thd, const char *name) const;
 public:
   void parse_error(uint err_number= ER_SYNTAX_ERROR);
   inline bool is_arena_for_set_stmt() {return arena_for_set_stmt != 0;}
@@ -3447,12 +3458,25 @@ public:
     DBUG_RETURN(select_lex);
   }
 
+  SELECT_LEX *current_select_or_default()
+  {
+    return current_select ? current_select : &builtin_select;
+  }
+
   bool copy_db_to(LEX_CSTRING *to);
 
   Name_resolution_context *current_context()
   {
     return context_stack.head();
   }
+  Name_resolution_context *current_context_or_default()
+  {
+    Name_resolution_context *ctx= current_context();
+    if (!ctx)
+      return &builtin_select.context;
+    return ctx;
+  }
+
   /*
     Restore the LEX and THD in case of a parse error.
   */
@@ -3648,7 +3672,12 @@ public:
     return create_item_qualified_asterisk(thd, &a, &b);
   }
 
-  Item *create_item_ident_nosp(THD *thd, Lex_ident_sys_st *name);
+  Item *create_item_ident_field(THD *thd, const char *db, const char *table,
+                                const Lex_ident_sys_st *name);
+  Item *create_item_ident_nosp(THD *thd, Lex_ident_sys_st *name)
+  {
+    return create_item_ident_field(thd, NullS, NullS, name);
+  }
   Item *create_item_ident_sp(THD *thd, Lex_ident_sys_st *name,
                              const char *start, const char *end);
   Item *create_item_ident(THD *thd, Lex_ident_cli_st *cname)
@@ -3785,6 +3814,10 @@ public:
   Item *create_item_limit(THD *thd,
                           const Lex_ident_cli_st *var_name,
                           const Lex_ident_cli_st *field_name);
+
+  Item *create_item_query_expression(THD *thd,
+                                     const char *tok_start,
+                                     st_select_lex_unit *unit);
 
   Item *make_item_func_replace(THD *thd, Item *org, Item *find, Item *replace);
   Item *make_item_func_substr(THD *thd, Item *a, Item *b, Item *c);
@@ -3979,6 +4012,17 @@ public:
            sp_for_loop_cursor_finalize(thd, loop) :
            sp_for_loop_intrange_finalize(thd, loop);
   }
+
+  /*
+    Make an Item when an identifier is found in the FOR loop bounds:
+      FOR rec IN cursor
+      FOR rec IN var1 .. var2
+      FOR rec IN row1.field1 .. xxx
+  */
+  Item *create_item_for_loop_bound(THD *thd,
+                                   const LEX_CSTRING *a,
+                                   const LEX_CSTRING *b,
+                                   const LEX_CSTRING *c);
   /* End of FOR LOOP methods */
 
   bool add_signal_statement(THD *thd, const class sp_condition_value *value);

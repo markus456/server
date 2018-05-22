@@ -363,6 +363,7 @@ enum enum_parsing_place
   IN_PART_FUNC,
   BEFORE_OPT_LIST,
   AFTER_LIST,
+  FOR_LOOP_BOUND,
   PARSING_PLACE_SIZE /* always should be the last */
 };
 

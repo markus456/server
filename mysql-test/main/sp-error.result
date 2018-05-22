@@ -439,6 +439,9 @@ create procedure nodb.bug3339() begin end|
 ERROR 42000: Unknown database 'nodb'
 create procedure bug2653_1(a int, out b int)
 set b = aa|
+call bug2653_1(1, @b)|
+ERROR 42S22: Unknown column 'aa' in 'field list'
+drop procedure bug2653_1|
 create procedure bug2653_2(a int, out b int)
 begin
 if aa < 0 then
@@ -447,12 +450,7 @@ else
 set b = a;
 end if;
 end|
-call bug2653_1(1, @b)|
 ERROR 42S22: Unknown column 'aa' in 'field list'
-call bug2653_2(2, @b)|
-ERROR 42S22: Unknown column 'aa' in 'field list'
-drop procedure bug2653_1|
-drop procedure bug2653_2|
 create procedure bug4344() drop procedure bug4344|
 ERROR HY000: Can't drop or alter a PROCEDURE from within another stored routine
 create procedure bug4344() drop function bug4344|
@@ -1067,6 +1065,7 @@ IF bug13037_foo THEN
 SELECT 1;
 END IF;
 END|
+ERROR 42S22: Unknown column 'bug13037_foo' in 'field list'
 CREATE PROCEDURE bug13037_p2()
 BEGIN
 SET @bug13037_foo = bug13037_bar;
@@ -1076,19 +1075,14 @@ BEGIN
 SELECT bug13037_foo;
 END|
 
-CALL bug13037_p1();
+CALL bug13037_p2();
+ERROR 42S22: Unknown column 'bug13037_bar' in 'field list'
+CALL bug13037_p3();
 ERROR 42S22: Unknown column 'bug13037_foo' in 'field list'
 CALL bug13037_p2();
 ERROR 42S22: Unknown column 'bug13037_bar' in 'field list'
 CALL bug13037_p3();
 ERROR 42S22: Unknown column 'bug13037_foo' in 'field list'
-CALL bug13037_p1();
-ERROR 42S22: Unknown column 'bug13037_foo' in 'field list'
-CALL bug13037_p2();
-ERROR 42S22: Unknown column 'bug13037_bar' in 'field list'
-CALL bug13037_p3();
-ERROR 42S22: Unknown column 'bug13037_foo' in 'field list'
-DROP PROCEDURE bug13037_p1;
 DROP PROCEDURE bug13037_p2;
 DROP PROCEDURE bug13037_p3;
 create database mysqltest1;

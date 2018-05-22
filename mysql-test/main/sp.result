@@ -4179,6 +4179,7 @@ select v, isnull(v);
 end if;
 end;
 end|
+ERROR 42S22: Unknown column 'undefined_var' in 'field list'
 create procedure bug14643_2()
 begin
 declare continue handler for sqlexception select 'boo' as 'Handler';
@@ -4190,18 +4191,7 @@ select 2;
 end case;
 select undefined_var;
 end|
-call bug14643_1()|
-Handler
-boo
-v	isnull(v)
-NULL	1
-call bug14643_2()|
-Handler
-boo
-Handler
-boo
-drop procedure bug14643_1|
-drop procedure bug14643_2|
+ERROR 42S22: Unknown column 'undefined_var' in 'field list'
 drop procedure if exists bug14304|
 drop table if exists t3, t4|
 create table t3(a int primary key auto_increment)|
@@ -4231,9 +4221,7 @@ create procedure bug14376()
 begin
 declare x int default x;
 end|
-call bug14376()|
 ERROR 42S22: Unknown column 'x' in 'field list'
-drop procedure bug14376|
 create procedure bug14376()
 begin
 declare x int default 42;
@@ -4476,6 +4464,7 @@ select 'no' as 'v';
 end if;
 select 'done' as 'End';
 end|
+ERROR 42S22: Unknown column 'v' in 'field list'
 create procedure bug14498_2()
 begin
 declare continue handler for sqlexception select 'error' as 'Handler';
@@ -4484,6 +4473,7 @@ select 'yes' as 'v';
 end while;
 select 'done' as 'End';
 end|
+ERROR 42S22: Unknown column 'v' in 'field list'
 create procedure bug14498_3()
 begin
 declare continue handler for sqlexception select 'error' as 'Handler';
@@ -4492,6 +4482,7 @@ select 'maybe' as 'v';
 until v end repeat;
 select 'done' as 'End';
 end|
+ERROR 42S22: Unknown column 'v' in 'field list'
 create procedure bug14498_4()
 begin
 declare continue handler for sqlexception select 'error' as 'Handler';
@@ -4505,6 +4496,7 @@ select '?' as 'v';
 end case;
 select 'done' as 'End';
 end|
+ERROR 42S22: Unknown column 'v' in 'field list'
 create procedure bug14498_5()
 begin
 declare continue handler for sqlexception select 'error' as 'Handler';
@@ -4518,38 +4510,7 @@ select '?' as 'v';
 end case;
 select 'done' as 'End';
 end|
-call bug14498_1()|
-Handler
-error
-End
-done
-call bug14498_2()|
-Handler
-error
-End
-done
-call bug14498_3()|
-v
-maybe
-Handler
-error
-End
-done
-call bug14498_4()|
-Handler
-error
-End
-done
-call bug14498_5()|
-Handler
-error
-End
-done
-drop procedure bug14498_1|
-drop procedure bug14498_2|
-drop procedure bug14498_3|
-drop procedure bug14498_4|
-drop procedure bug14498_5|
+ERROR 42S22: Unknown column 'v' in 'field list'
 drop table if exists t3|
 drop procedure if exists bug15231_1|
 drop procedure if exists bug15231_2|
@@ -8339,14 +8300,12 @@ DECLARE name VARCHAR(10);
 SET name="hello";
 call p1(name2);
 END|
+ERROR 42S22: Unknown column 'name2' in 'field list'
 call p2();
 a
 hello
-call p3();
-ERROR 42S22: Unknown column 'name2' in 'field list'
 drop procedure p1;
 drop procedure p2;
-drop procedure p3;
 #
 # MDEV-15328: MariaDB 10.2.13 Crashes upon CALL PROCEDURE PARAM
 # LAST_INSERT_ID ()

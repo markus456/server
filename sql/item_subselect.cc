@@ -115,7 +115,8 @@ void Item_subselect::init(st_select_lex *select_lex,
       do not take into account expression inside aggregate functions because
       they can access original table fields
     */
-    parsing_place= (outer_select->in_sum_expr ?
+    // QQ: shouldn't we use relink_hack() instead ?
+    parsing_place= (!outer_select || outer_select->in_sum_expr ?
                     NO_MATTER :
                     outer_select->parsing_place);
     if (unit->is_unit_op() && unit->first_select()->next_select())
@@ -240,6 +241,9 @@ bool Item_subselect::fix_fields(THD *thd_param, Item **ref)
 
   {
     SELECT_LEX *upper= unit->outer_select();
+    // QQ: shouldn't we use relink_hack() instead?
+    if (!upper)
+      upper= &thd_param->lex->builtin_select;
     if (upper->parsing_place == IN_HAVING)
       upper->subquery_in_having= 1;
     /* The subquery is an expression cache candidate */
@@ -1395,12 +1399,46 @@ bool Item_singlerow_subselect::get_date(MYSQL_TIME *ltime,ulonglong fuzzydate)
 }
 
 
+/*
+  "IN" and "EXISTS" subselect can appear in two statement types:
+
+  1. Statements that can have table columns, such as SELECT, DELETE, UPDATE
+  2. Statements that cannot have table columns, e.g:
+     RETURN ((1) IN (SELECT * FROM t1))
+     IF ((1) IN (SELECT * FROM t1))
+
+  Statements of the first type call master_select_push() in the beginning.
+  In such case everything is properly linked.
+
+  Statements of the second type do not call mastr_select_push().
+  Here we catch the second case and relink thd->lex->builtin_select and
+  select_lex to properly point to each other.
+
+  QQ: Shouldn't subselects of other type also call relink_hack()?
+  QQ: Can we do it at constructor time instead?
+*/
+static void relink_hack(THD *thd, st_select_lex *select_lex)
+{
+  if (!thd->lex->select_stack_top) // Statements of the second type
+  {
+    if (!select_lex->get_master()->get_master())
+      ((st_select_lex *) select_lex->get_master())->
+        set_master(&thd->lex->builtin_select);
+    if (!thd->lex->builtin_select.get_slave())
+      thd->lex->builtin_select.set_slave(select_lex->get_master());
+  }
+}
+
+
 Item_exists_subselect::Item_exists_subselect(THD *thd,
                                              st_select_lex *select_lex):
   Item_subselect(thd), upper_not(NULL), abort_on_null(0),
   emb_on_expr_nest(NULL), optimizer(0), exists_transformed(0)
 {
   DBUG_ENTER("Item_exists_subselect::Item_exists_subselect");
+
+  relink_hack(thd, select_lex);
+
   init(select_lex, new (thd->mem_root) select_exists_subselect(thd, this));
   max_columns= UINT_MAX;
   null_value= FALSE; //can't be NULL
@@ -1443,6 +1481,9 @@ Item_in_subselect::Item_in_subselect(THD *thd, Item * left_exp,
 {
   DBUG_ENTER("Item_in_subselect::Item_in_subselect");
   DBUG_PRINT("info", ("in_strategy: %u", (uint)in_strategy));
+
+  relink_hack(thd, select_lex);
+
   left_expr_orig= left_expr= left_exp;
   /* prepare to possible disassembling the item in convert_subq_to_sj() */
   if (left_exp->type() == Item::ROW_ITEM)
