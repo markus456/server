@@ -3545,9 +3545,6 @@ public:
   int case_stmt_action_expr(Item* expr);
   int case_stmt_action_when(Item *when, bool simple);
   int case_stmt_action_then();
-  bool add_select_to_union_list(bool is_union_distinct,
-                                enum sub_select_type type,
-                                bool is_top_level);
   bool setup_select_in_parentheses();
   bool set_trigger_new_row(const LEX_CSTRING *name, Item *val);
   bool set_trigger_field(const LEX_CSTRING *name1, const LEX_CSTRING *name2,
@@ -4146,7 +4143,6 @@ public:
 
   SELECT_LEX *exclude_last_select();
   SELECT_LEX *exclude_not_first_select(SELECT_LEX *exclude);
-  bool add_unit_in_brackets(SELECT_LEX *nselect);
   void check_automatic_up(enum sub_select_type type);
   bool create_or_alter_view_finalize(THD *thd, Table_ident *table_ident);
   bool add_alter_view(THD *thd, uint16 algorithm, enum_view_suid suid,
