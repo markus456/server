@@ -4066,12 +4066,7 @@ sp_proc_stmt_return:
         ;
 
 reset_lex_expr:
-          {
-            Lex->sphead->reset_lex(thd);
-            // will be poped in sp_proc_stmt_exit or sp_proc_stmt_continue
-            if (Lex->main_select_push())
-              MYSQL_YYABORT;
-          }
+          { Lex->sphead->reset_lex(thd); }
           expr
           { $$= $2; }
         ;
@@ -4089,14 +4084,12 @@ sp_proc_stmt_exit:
           }
         | EXIT_SYM WHEN_SYM reset_lex_expr
           {
-            Lex->pop_select(); //main select pushed in reset_lex_expr
             if (Lex->sp_exit_statement(thd, $3) ||
                 Lex->sphead->restore_lex(thd))
               MYSQL_YYABORT;
           }
         | EXIT_SYM label_ident WHEN_SYM reset_lex_expr
           {
-            Lex->pop_select(); //main select pushed in reset_lex_expr
             if (Lex->sp_exit_statement(thd, &$2, $4) ||
                 Lex->sphead->restore_lex(thd))
               MYSQL_YYABORT;
@@ -4116,14 +4109,12 @@ sp_proc_stmt_continue:
           }
         | CONTINUE_SYM WHEN_SYM reset_lex_expr
           {
-            Lex->pop_select(); //main select pushed in reset_lex_expr
             if (Lex->sp_continue_statement(thd, $3) ||
                 Lex->sphead->restore_lex(thd))
               MYSQL_YYABORT;
           }
         | CONTINUE_SYM label_ident WHEN_SYM reset_lex_expr
           {
-            Lex->pop_select(); //main select pushed in reset_lex_expr
             if (Lex->sp_continue_statement(thd, &$2, $4) ||
                 Lex->sphead->restore_lex(thd))
               MYSQL_YYABORT;
@@ -13940,8 +13931,6 @@ truncate:
           {
             LEX* lex= Lex;
             lex->sql_command= SQLCOM_TRUNCATE;
-            if (lex->main_select_push())
-              MYSQL_YYABORT;
             lex->alter_info.reset();
             lex->builtin_select.options= 0;
             lex->builtin_select.sql_cache= SELECT_LEX::SQL_CACHE_UNSPECIFIED;
