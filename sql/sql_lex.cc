@@ -5347,12 +5347,12 @@ err:
   DBUG_RETURN(NULL);
 }
 
-SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
+SELECT_LEX *LEX::wrap_select_chain_into_derived(SELECT_LEX *sel)
 {
   SELECT_LEX *dummy_select;
   SELECT_LEX_UNIT *unit;
   Table_ident *ti;
-  DBUG_ENTER("LEX::link_selects_chain_down");
+  DBUG_ENTER("LEX::wrap_select_chain_into_derived");
 
   if (!(dummy_select= alloc_select(TRUE)))
      DBUG_RETURN(NULL);
@@ -5426,43 +5426,26 @@ bool LEX::push_context(Name_resolution_context *context)
 }
 
 
-bool LEX::push_new_select(SELECT_LEX *last)
+SELECT_LEX *LEX::create_priority_nest(SELECT_LEX *first_in_nest)
 {
-  DBUG_ENTER("LEX::push new_select");
-  DBUG_PRINT("info", ("Push last select: %p (%d)",
-                       last, last->select_number));
-  bool res= last_select_stack.push_front(last, thd->mem_root);
-  DBUG_RETURN(res);
+  DBUG_ENTER("LEX::create_priority_nest");
+  DBUG_ASSERT(first_in_nest->first_nested);
+  enum sub_select_type wr_unit_type= first_in_nest->linkage;
+  bool wr_distinct= first_in_nest->distinct;
+  SELECT_LEX *attach_to= first_in_nest->first_nested;
+  attach_to->cut_next();
+  SELECT_LEX *wrapper= wrap_select_chain_into_derived(first_in_nest);
+  if (wrapper)
+  {
+    first_in_nest->first_nested= NULL;
+    wrapper->set_linkage_and_distinct(wr_unit_type, wr_distinct);
+    wrapper->first_nested= attach_to->first_nested;
+    wrapper->set_master_unit(attach_to->master_unit());
+    attach_to->link_neighbour(wrapper);
+  }
+  DBUG_RETURN(wrapper);
 }
 
-
-bool check_intersect_prefix(SELECT_LEX* first_in_unit)
-{
-  SELECT_LEX *sel;
-  for (sel= first_in_unit->next_select();
-       sel && sel->linkage == INTERSECT_TYPE;
-       sel= sel->next_select())
-    ;
-  return (sel == NULL);
-}
-
-
-SELECT_LEX *LEX::pop_new_select_and_wrap()
-{
-  DBUG_ENTER("LEX::pop_new_select_and_wrap");
-  SELECT_LEX *sel;
-  SELECT_LEX *last= pop_new_select();
-  SELECT_LEX *first= last->next_select();
-  last->cut_next();
-  enum sub_select_type op= first->linkage;
-  bool ds= first->distinct;
-  if (!(sel= link_selects_chain_down(first)))
-      DBUG_RETURN(NULL);
-  last->link_neighbour(sel);
-  sel->set_linkage_and_distinct(op, ds);
-  sel->set_master_unit(last->master_unit());
-  DBUG_RETURN(sel);
-}
 
 /**
   Checks if we need finish "automatic brackets" mode

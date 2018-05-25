@@ -9247,16 +9247,13 @@ query_primary:
 query_primary_parens:
           '(' query_expression_unit
           {
-            SELECT_LEX *last= $2->pre_last_parse->next_select();
-            int cmp= cmp_unit_op($2->first_select()->next_select()->linkage,
-                                last->linkage);
-            if (cmp < 0)
+            SELECT_LEX *first_in_nest=
+                         $2->pre_last_parse->next_select()->first_nested;
+            if (first_in_nest->first_nested != first_in_nest)
             {
-              if (!check_intersect_prefix($2->first_select()))
-              {
-                if (Lex->pop_new_select_and_wrap() == NULL)
-                  MYSQL_YYABORT;
-              }
+              /* There is a priority jump starting from first_in_nest */
+              if (Lex->create_priority_nest(first_in_nest) == NULL)
+                MYSQL_YYABORT;
             }
             Lex->push_select($2->fake_select_lex);
           }
@@ -9340,6 +9337,7 @@ query_expression_unit:
             }
             sel1->link_neighbour(sel2);
             sel2->set_linkage_and_distinct($2.unit_type, $2.distinct);
+            sel2->first_nested= sel1->first_nested= sel1;
             $$= Lex->create_unit(sel1);
             $$->pre_last_parse= sel1;
             if ($$ == NULL)
@@ -9363,23 +9361,23 @@ query_expression_unit:
             int cmp= cmp_unit_op($2.unit_type, last->linkage);
             if (cmp == 0)
             {
-              // do nothing, this part will be just connected
+              sel1->first_nested= last->first_nested;
             }
             else if (cmp > 0)
             {
-              // Store beginning and continue to connect parts
-              if (Lex->push_new_select($1->pre_last_parse))
-                MYSQL_YYABORT;
+              last->first_nested= $1->pre_last_parse;
+              sel1->first_nested= last;
             }
             else /* cmp < 0 */
             {
-              // wrap stored part in a select, then continue to connect parts
-              if (!check_intersect_prefix($1->first_select()))
+              SELECT_LEX *first_in_nest= last->first_nested;
+              if (first_in_nest->first_nested != first_in_nest)
               {
-                if ((last= Lex->pop_new_select_and_wrap()) == NULL)
+                /* There is a priority jump starting from first_in_nest */
+                if ((last= Lex->create_priority_nest(first_in_nest)) == NULL)
                   MYSQL_YYABORT;
-                last->set_master_unit($1);
               }
+              sel1->first_nested= last->first_nested;
             }
             last->link_neighbour(sel1);
             sel1->set_master_unit($1);
@@ -9438,16 +9436,13 @@ query_expression_body:
           }
         | query_expression_unit
           {
-            SELECT_LEX *last= $1->pre_last_parse->next_select();
-            int cmp= cmp_unit_op($1->first_select()->next_select()->linkage,
-                                last->linkage);
-            if (cmp < 0)
+            SELECT_LEX *first_in_nest=
+                         $1->pre_last_parse->next_select()->first_nested;
+            if (first_in_nest->first_nested != first_in_nest)
             {
-              if (!check_intersect_prefix($1->first_select()))
-              {
-                if (Lex->pop_new_select_and_wrap() == NULL)
-                  MYSQL_YYABORT;
-              }
+              /* There is a priority jump starting from first_in_nest */
+              if (Lex->create_priority_nest(first_in_nest) == NULL)
+                MYSQL_YYABORT;
             }
             Lex->push_select($1->fake_select_lex);
           }

@@ -177,8 +177,6 @@ inline int cmp_unit_op(enum sub_select_type op1, enum sub_select_type op2)
   return (op1 == INTERSECT_TYPE ? 1 : 0) - (op2 == INTERSECT_TYPE ? 1 : 0);
 }
 
-bool check_intersect_prefix(SELECT_LEX* first_in_unit);
-
 enum unit_common_op {OP_MIX, OP_UNION, OP_INTERSECT, OP_EXCEPT};
 
 enum enum_view_suid
@@ -983,6 +981,23 @@ public:
 class st_select_lex: public st_select_lex_node
 {
 public:
+  /*
+    Currently the field first_nested is used only by parser.
+    It containa either a reference to the first select
+    of the nest of selects to which 'this' belongs to, or
+    in the case of priority jump it contains a reference to
+    the select to which the priority nest has to be attached to.
+    If there is no priority jump then the first select of the
+    nest contains the reference to itself in first_nested.
+    Example:
+      select1 union select2 intersect select
+    Here we have a priority jump at select2.
+    So select2->first_nested points to select1,
+    while select3->first_nested points to select2 and
+    select1->first_nested points to select1.
+  */
+  st_select_lex *first_nested;
+
   Name_resolution_context context;
   LEX_CSTRING db;
   Item *where, *having;                         /* WHERE & HAVING clauses */
@@ -3016,7 +3031,6 @@ public:
     required a local context, the parser pops the top-most context.
   */
   List<Name_resolution_context> context_stack;
-  List<SELECT_LEX> last_select_stack;
   SELECT_LEX *select_stack[MAX_SELECT_NESTING];
   uint select_stack_top;
 
@@ -3386,24 +3400,12 @@ public:
     DBUG_VOID_RETURN;
   }
 
-  bool push_new_select(SELECT_LEX *last);
-
-  SELECT_LEX *pop_new_select()
-  {
-    DBUG_ENTER("LEX::pop_new_select");
-    SELECT_LEX* last= last_select_stack.pop();
-    DBUG_PRINT("info", ("Pop last elect: %p (%d)",
-                         last, last->select_number));
-    DBUG_RETURN(last);
-  }
-
   SELECT_LEX *select_stack_head()
   {
     if (likely(select_stack_top))
       return select_stack[select_stack_top - 1];
     return NULL;
   }
-
 
   bool push_select(SELECT_LEX *select_lex)
   {
@@ -4194,10 +4196,10 @@ public:
   SELECT_LEX *alloc_select(bool is_select);
   SELECT_LEX_UNIT *create_unit(SELECT_LEX*);
   SELECT_LEX *wrap_unit_into_derived(SELECT_LEX_UNIT *unit);
-  SELECT_LEX *link_selects_chain_down(SELECT_LEX *sel);
+  SELECT_LEX *wrap_select_chain_into_derived(SELECT_LEX *sel);
   bool main_select_push();
   bool insert_select_hack(SELECT_LEX *sel);
-  SELECT_LEX *pop_new_select_and_wrap();
+  SELECT_LEX *create_priority_nest(SELECT_LEX *first_in_nest);
 
   void set_main_unit(st_select_lex_unit *u)
   {
