@@ -681,6 +681,384 @@ Virtual_column_info *add_virtual_expression(THD *thd, Item *expr)
    return v;
 }
 
+
+/**
+  Process unit parsed in brackets
+*/
+
+bool LEX::parsed_unit_in_brackets(SELECT_LEX_UNIT *unit)
+{
+  SELECT_LEX *first_in_nest= unit->pre_last_parse->next_select()->first_nested;
+  if (first_in_nest->first_nested != first_in_nest)
+  {
+    /* There is a priority jump starting from first_in_nest */
+    if (Lex->create_priority_nest(first_in_nest) == NULL)
+      return true;
+  }
+  Lex->push_select(unit->fake_select_lex);
+  return false;
+}
+
+
+/**
+  Process tail of unit parsed in brackets
+*/
+SELECT_LEX *LEX::parsed_unit_in_brackets_tail(SELECT_LEX_UNIT *unit,
+                                              Lex_order_limit_lock * l)
+{
+  Lex->pop_select();
+  if (l)
+  {
+    (l)->set_to(unit->fake_select_lex);
+  }
+  return unit->first_select();
+}
+
+
+/**
+  Process select parsed in brackets
+*/
+
+SELECT_LEX *LEX::parsed_select(SELECT_LEX *sel, Lex_order_limit_lock * l)
+{
+  pop_select();
+  if (l)
+  {
+    if (sel->next_select())
+    {
+      SELECT_LEX_UNIT *unit= sel->master_unit();
+      if (!unit)
+        unit= Lex->create_unit(sel);
+      if (!unit)
+        return NULL;
+      if (!unit->fake_select_lex->is_set_query_expr_tail)
+        l->set_to(unit->fake_select_lex);
+      else
+      {
+        sel= Lex->wrap_unit_into_derived(unit);
+        if (!sel)
+          return NULL;
+        l->set_to(sel);
+      }
+    }
+    else if (!sel->is_set_query_expr_tail)
+    {
+      l->set_to(sel);
+    }
+    else
+    {
+      SELECT_LEX_UNIT *unit= Lex->create_unit(sel);
+      if (!unit)
+        return NULL;
+      sel= Lex->wrap_unit_into_derived(unit);
+      if (!sel)
+        return NULL;
+      l->set_to(sel);
+    }
+  }
+  return sel;
+}
+
+
+/**
+  Process select parsed in brackets
+*/
+
+SELECT_LEX *LEX::parsed_select_in_brackets(SELECT_LEX *sel,
+                                           Lex_order_limit_lock * l)
+{
+  sel->braces= TRUE;
+  return parsed_select(sel, l);
+}
+
+
+SELECT_LEX_UNIT *LEX::parsed_select_expr_start(SELECT_LEX *s1, SELECT_LEX *s2,
+                                               enum sub_select_type unit_type,
+                                               bool distinct)
+{
+  SELECT_LEX_UNIT *res;
+  SELECT_LEX *sel1;
+  SELECT_LEX *sel2;
+  if (!s1->next_select())
+    sel1= s1;
+  else
+  {
+    sel1= Lex->wrap_unit_into_derived(s1->master_unit());
+    if (!sel1)
+      return NULL;
+  }
+  if (!s2->next_select())
+    sel2= s2;
+  else
+  {
+    sel2= Lex->wrap_unit_into_derived(s2->master_unit());
+    if (!sel2)
+      return NULL;
+  }
+  sel1->link_neighbour(sel2);
+  sel2->set_linkage_and_distinct(unit_type, distinct);
+  sel2->first_nested= sel1->first_nested= sel1;
+  res= Lex->create_unit(sel1);
+  if (res == NULL)
+    return NULL;
+  res->pre_last_parse= sel1;
+  return res;
+}
+
+
+SELECT_LEX_UNIT *LEX::parsed_select_expr_cont(SELECT_LEX_UNIT *unit,
+                                              SELECT_LEX *s2,
+                                              enum sub_select_type unit_type,
+                                              bool distinct)
+{
+  SELECT_LEX *sel1;
+  if (!s2->next_select())
+    sel1= s2;
+  else
+  {
+    sel1= Lex->wrap_unit_into_derived(s2->master_unit());
+    if (!sel1)
+      return NULL;
+  }
+  SELECT_LEX *last= unit->pre_last_parse->next_select();
+
+  int cmp= cmp_unit_op(unit_type, last->linkage);
+  if (cmp == 0)
+  {
+    sel1->first_nested= last->first_nested;
+  }
+  else if (cmp > 0)
+  {
+    last->first_nested= unit->pre_last_parse;
+    sel1->first_nested= last;
+  }
+  else /* cmp < 0 */
+  {
+    SELECT_LEX *first_in_nest= last->first_nested;
+    if (first_in_nest->first_nested != first_in_nest)
+    {
+      /* There is a priority jump starting from first_in_nest */
+      if ((last= Lex->create_priority_nest(first_in_nest)) == NULL)
+        return NULL;
+    }
+    sel1->first_nested= last->first_nested;
+  }
+  last->link_neighbour(sel1);
+  sel1->set_master_unit(unit);
+  sel1->set_linkage_and_distinct(unit_type, distinct);
+  unit->pre_last_parse= last;
+  return unit;
+}
+
+/**
+  Process parsed select in body
+*/
+
+SELECT_LEX_UNIT *LEX::parsed_body_select(SELECT_LEX *sel,
+                                         Lex_order_limit_lock * l)
+{
+  if (!(sel= parsed_select(sel, l)))
+    return NULL;
+
+  SELECT_LEX_UNIT *res= Lex->create_unit(sel);
+  return res;
+}
+
+/**
+  Process parsed unit in body
+*/
+
+bool LEX::parsed_body_unit(SELECT_LEX_UNIT *unit)
+{
+  SELECT_LEX *first_in_nest=
+    unit->pre_last_parse->next_select()->first_nested;
+  if (first_in_nest->first_nested != first_in_nest)
+  {
+    /* There is a priority jump starting from first_in_nest */
+    if (create_priority_nest(first_in_nest) == NULL)
+      return true;
+  }
+  push_select(unit->fake_select_lex);
+  return false;
+}
+
+/**
+  Process parsed tail of unit in body
+
+  TODO: make processing for double tail case
+*/
+
+SELECT_LEX_UNIT *LEX::parsed_body_unit_tail(SELECT_LEX_UNIT *unit,
+                                            Lex_order_limit_lock * l)
+{
+  pop_select();
+  if (l)
+  {
+    (l)->set_to(unit->fake_select_lex);
+  }
+  return unit;
+}
+
+/**
+  Process subselect parsing
+*/
+
+SELECT_LEX *LEX::parsed_subselect(SELECT_LEX_UNIT *unit, char *place)
+{
+  if (!expr_allows_subselect ||
+      sql_command == (int)SQLCOM_PURGE)
+  {
+    thd->parse_error(ER_SYNTAX_ERROR, place);
+    return NULL;
+  }
+
+  // Add the subtree of subquery to the current SELECT_LEX
+  SELECT_LEX *curr_sel= select_stack_head();
+  DBUG_ASSERT(current_select == curr_sel);
+  if (curr_sel)
+  {
+    curr_sel->register_unit(unit, &curr_sel->context);
+    curr_sel->add_statistics(unit);
+  }
+
+  return unit->first_select();
+}
+
+
+/**
+  Process INSERT-like select
+*/
+
+bool LEX::parsed_insert_select(SELECT_LEX *first_select)
+{
+  if (sql_command == SQLCOM_INSERT ||
+      sql_command == SQLCOM_REPLACE)
+  {
+    if (sql_command == SQLCOM_INSERT)
+      sql_command= SQLCOM_INSERT_SELECT;
+    else
+      sql_command= SQLCOM_REPLACE_SELECT;
+  }
+  insert_select_hack(first_select);
+  if (check_main_unit_semantics())
+    return true;
+
+  // fix "main" select
+  SELECT_LEX *blt= pop_select();
+  DBUG_ASSERT(blt == &builtin_select);
+  push_select(first_select);
+  return false;
+}
+
+
+bool LEX::parsed_TVC_start()
+{
+  SELECT_LEX *sel;
+  many_values.empty();
+  insert_list= 0;
+  if (!(sel= alloc_select(TRUE)) ||
+        push_select(sel))
+    return true;
+  sel->init_select();
+  sel->braces= FALSE; // just initialisation
+  return false;
+}
+
+
+SELECT_LEX *LEX::parsed_TVC_end()
+{
+
+  SELECT_LEX *res= pop_select(); // above TVC select
+  if (!(res->tvc=
+        new (thd->mem_root) table_value_constr(many_values,
+          res,
+          res->options)))
+    return NULL;
+  many_values.empty();
+  return res;
+}
+
+
+TABLE_LIST *LEX::parsed_derived_select(SELECT_LEX *sel, int for_system_time,
+                                       LEX_CSTRING *alias)
+{
+  TABLE_LIST *res;
+  derived_tables|= DERIVED_SUBQUERY;
+  sel->linkage= DERIVED_TABLE_TYPE;
+  sel->braces= FALSE;
+  // Add the subtree of subquery to the current SELECT_LEX
+  SELECT_LEX *curr_sel= select_stack_head();
+  DBUG_ASSERT(current_select == curr_sel);
+  SELECT_LEX_UNIT *unit= sel->master_unit();
+  if (!unit)
+  {
+    unit= create_unit(sel);
+    if (!unit)
+      return NULL;
+  }
+  curr_sel->register_unit(unit, &curr_sel->context);
+  curr_sel->add_statistics(unit);
+
+  Table_ident *ti= new (thd->mem_root) Table_ident(unit);
+  if (ti == NULL)
+    return NULL;
+  if (!(res= curr_sel->add_table_to_list(thd, ti, alias, 0,
+                                         TL_READ, MDL_SHARED_READ)))
+    return NULL;
+  if (for_system_time)
+  {
+    res->vers_conditions= Lex->vers_conditions;
+  }
+  return res;
+}
+
+TABLE_LIST *LEX::parsed_derived_unit(SELECT_LEX_UNIT *unit,
+                                     int for_system_time,
+                                     LEX_CSTRING *alias)
+{
+  TABLE_LIST *res;
+  derived_tables|= DERIVED_SUBQUERY;
+  unit->first_select()->linkage= DERIVED_TABLE_TYPE;
+
+  // Add the subtree of subquery to the current SELECT_LEX
+  SELECT_LEX *curr_sel= select_stack_head();
+  DBUG_ASSERT(current_select == curr_sel);
+  curr_sel->register_unit(unit, &curr_sel->context);
+  curr_sel->add_statistics(unit);
+
+  Table_ident *ti= new (thd->mem_root) Table_ident(unit);
+  if (ti == NULL)
+    return NULL;
+  if (!(res= curr_sel->add_table_to_list(thd, ti, alias, 0,
+                                         TL_READ, MDL_SHARED_READ)))
+    return NULL;
+  if (for_system_time)
+  {
+    res->vers_conditions= vers_conditions;
+  }
+  return res;
+}
+
+bool LEX::parsed_create_view(SELECT_LEX_UNIT *unit, int check)
+{
+  SQL_I_List<TABLE_LIST> *save= &first_select_lex()->table_list;
+  set_main_unit(unit);
+  if (check_main_unit_semantics())
+    return true;
+  first_select_lex()->table_list.push_front(save);
+  current_select= Lex->first_select_lex();
+  size_t len= YYLIP->get_cpp_ptr() - create_view->select.str;
+  void *create_view_select= thd->memdup(create_view->select.str, len);
+  create_view->select.length= len;
+  create_view->select.str= (char *) create_view_select;
+  size_t not_used;
+  trim_whitespace(thd->charset(),
+      &create_view->select, &not_used);
+  create_view->check= check;
+  parsing_options.allows_variable= TRUE;
+  return false;
+}
+
 %}
 %union {
   int  num;
@@ -5221,48 +5599,16 @@ opt_create_select:
 create_select_query_expression:
           query_expression
           {
-            SELECT_LEX *first_select= $1->first_select();
-
-            if (Lex->sql_command == SQLCOM_INSERT ||
-                Lex->sql_command == SQLCOM_REPLACE)
-            {
-              if (Lex->sql_command == SQLCOM_INSERT)
-                Lex->sql_command= SQLCOM_INSERT_SELECT;
-              else
-                Lex->sql_command= SQLCOM_REPLACE_SELECT;
-            }
-            Lex->insert_select_hack(first_select);
-            if (Lex->check_main_unit_semantics())
+            if (Lex->parsed_insert_select($1->first_select()))
               MYSQL_YYABORT;
-
-            // fix "main" select
-            SELECT_LEX *blt= Lex->pop_select();
-            DBUG_ASSERT(blt == &Lex->builtin_select);
-            Lex->push_select(first_select);
           }
         | LEFT_PAREN_WITH with_clause query_expression_body ')'
           {
             SELECT_LEX *first_select= $3->first_select();
             $3->set_with_clause($2);
             $2->attach_to(first_select);
-
-            if (Lex->sql_command == SQLCOM_INSERT ||
-                Lex->sql_command == SQLCOM_REPLACE)
-            {
-              if (Lex->sql_command == SQLCOM_INSERT)
-                Lex->sql_command= SQLCOM_INSERT_SELECT;
-              else
-                Lex->sql_command= SQLCOM_REPLACE_SELECT;
-            }
-
-            Lex->insert_select_hack(first_select);
-            if (Lex->check_main_unit_semantics())
+            if (Lex->parsed_insert_select(first_select))
               MYSQL_YYABORT;
-
-            // fix "main" select
-            SELECT_LEX *blt= Lex->pop_select();
-            DBUG_ASSERT(blt == &Lex->builtin_select);
-            Lex->push_select(first_select);
           }
         ;
 
@@ -9040,34 +9386,20 @@ simple_table:
           query_specification      { $$= $1; }
         | table_value_constructor  { $$= $1; }
         ;
-        
+
 table_value_constructor:
 	  VALUES
 	  {
-	    LEX *lex= Lex;
-            SELECT_LEX *sel;
-            //lex->field_list.empty();
-            lex->many_values.empty();
-            lex->insert_list=0;
-            if (!(sel= lex->alloc_select(TRUE)) ||
-                  lex->push_select(sel))
+            if (Lex->parsed_TVC_start())
               MYSQL_YYABORT;
-            sel->init_select();
-            sel->braces= FALSE; // just initialisation
 	  }
 	  values_list
 	  {
-	    LEX *lex=Lex;
-            $$= lex->pop_select(); // above TVC select
-	    if (!($$->tvc=
-	          new (lex->thd->mem_root) table_value_constr(lex->many_values,
-                                                              $$,
-                                                              $$->options)))
+            if (!($$= Lex->parsed_TVC_end()))
 	      MYSQL_YYABORT;
-	    lex->many_values.empty();
 	  }
 	;
-	
+
 query_specification:
           SELECT_SYM
           {
@@ -9114,24 +9446,12 @@ query_primary:
 query_primary_parens:
           '(' query_expression_unit
           {
-            SELECT_LEX *first_in_nest=
-                         $2->pre_last_parse->next_select()->first_nested;
-            if (first_in_nest->first_nested != first_in_nest)
-            {
-              /* There is a priority jump starting from first_in_nest */
-              if (Lex->create_priority_nest(first_in_nest) == NULL)
-                MYSQL_YYABORT;
-            }
-            Lex->push_select($2->fake_select_lex);
+            if (Lex->parsed_unit_in_brackets($2))
+              MYSQL_YYABORT;
           }
           query_expression_tail ')'
           {
-            Lex->pop_select();
-            if ($4)
-            {
-              ($4)->set_to($2->fake_select_lex);
-            }
-            $$= $2->first_select();
+            $$= Lex->parsed_unit_in_brackets_tail($2, $4);
           }
         | '(' query_primary
           {
@@ -9139,43 +9459,8 @@ query_primary_parens:
           }
           query_expression_tail ')'
           {
-            Lex->pop_select();
-            $$= $2;
-            $$->braces= TRUE;
-            if ($4)
-            {
-              if ($2->next_select())
-              {
-                SELECT_LEX_UNIT *unit= $2->master_unit();
-                if (!unit)
-                  unit= Lex->create_unit($2);
-                if (!unit)
-                  YYABORT;
-                if (!unit->fake_select_lex->is_set_query_expr_tail)
-                  $4->set_to(unit->fake_select_lex);
-                else
-                {
-                  $$= Lex->wrap_unit_into_derived(unit);
-                  if (!$$)
-                    YYABORT;
-                  $4->set_to($$);
-                }
-              }
-              else if (!$2->is_set_query_expr_tail)
-              {
-                $4->set_to($2);
-              }
-              else
-              {
-                SELECT_LEX_UNIT *unit= Lex->create_unit($2);
-                if (!unit)
-                  YYABORT;
-                $$= Lex->wrap_unit_into_derived(unit);
-                if (!$$)
-                  YYABORT;
-                $4->set_to($$);
-              }
-            }
+            if (!($$= Lex->parsed_select_in_brackets($2, $4)))
+              YYABORT;
           }
         ;
 
@@ -9184,73 +9469,17 @@ query_expression_unit:
           unit_type_decl
           query_primary
           {
-            SELECT_LEX *sel1;
-            SELECT_LEX *sel2;
-            if (!$1->next_select())
-              sel1= $1;
-            else
-            {
-              sel1= Lex->wrap_unit_into_derived($1->master_unit());
-              if (!sel1)
-                YYABORT;
-            }
-            if (!$3->next_select())
-              sel2= $3;
-            else
-            {
-              sel2= Lex->wrap_unit_into_derived($3->master_unit());
-              if (!sel2)
-                YYABORT;
-            }
-            sel1->link_neighbour(sel2);
-            sel2->set_linkage_and_distinct($2.unit_type, $2.distinct);
-            sel2->first_nested= sel1->first_nested= sel1;
-            $$= Lex->create_unit(sel1);
-            $$->pre_last_parse= sel1;
-            if ($$ == NULL)
+            if (!($$= Lex->parsed_select_expr_start($1, $3, $2.unit_type,
+                                                    $2.distinct)))
               YYABORT;
           }
         | query_expression_unit
           unit_type_decl
           query_primary
           {
-            SELECT_LEX *sel1;
-            if (!$3->next_select())
-              sel1= $3;
-            else
-            {
-              sel1= Lex->wrap_unit_into_derived($3->master_unit());
-              if (!sel1)
-                YYABORT;
-            }
-            SELECT_LEX *last= $1->pre_last_parse->next_select();
-
-            int cmp= cmp_unit_op($2.unit_type, last->linkage);
-            if (cmp == 0)
-            {
-              sel1->first_nested= last->first_nested;
-            }
-            else if (cmp > 0)
-            {
-              last->first_nested= $1->pre_last_parse;
-              sel1->first_nested= last;
-            }
-            else /* cmp < 0 */
-            {
-              SELECT_LEX *first_in_nest= last->first_nested;
-              if (first_in_nest->first_nested != first_in_nest)
-              {
-                /* There is a priority jump starting from first_in_nest */
-                if ((last= Lex->create_priority_nest(first_in_nest)) == NULL)
-                  MYSQL_YYABORT;
-              }
-              sel1->first_nested= last->first_nested;
-            }
-            last->link_neighbour(sel1);
-            sel1->set_master_unit($1);
-            sel1->set_linkage_and_distinct($2.unit_type, $2.distinct);
-            $$= $1;
-            $$->pre_last_parse= last;
+            if (!($$= Lex->parsed_select_expr_cont($1, $3, $2.unit_type,
+                                                   $2.distinct)))
+              YYABORT;
           }
         ;
 
@@ -9261,66 +9490,18 @@ query_expression_body:
           }
           query_expression_tail
           {
-            Lex->pop_select();
-            SELECT_LEX *sel= $1;
-            if ($3)
-            {
-              if ($1->next_select())
-              {
-                SELECT_LEX_UNIT *unit= $1->master_unit();
-                if (!unit)
-                  unit= Lex->create_unit($1);
-                if (!unit)
-                  YYABORT;
-                if (!unit->fake_select_lex->is_set_query_expr_tail)
-                  $3->set_to(unit->fake_select_lex);
-                else
-                {
-                  SELECT_LEX *sel= Lex->wrap_unit_into_derived(unit);
-                  if (!sel)
-                    YYABORT;
-                  $3->set_to(sel);
-                }
-              }
-              else if (!$1->is_set_query_expr_tail)
-                $3->set_to($1);
-              else
-              {
-                SELECT_LEX_UNIT *unit= $1->master_unit();
-                if (!unit)
-                  unit= Lex->create_unit($1);
-                if (!unit)
-                  YYABORT;
-                sel= Lex->wrap_unit_into_derived(unit);
-                if (!sel)
-                  YYABORT;
-                $3->set_to(sel);
-              }
-            }
-            $$= Lex->create_unit(sel);
-            if ($$ == NULL)
+            if (!($$= Lex->parsed_body_select($1, $3)))
               YYABORT;
           }
         | query_expression_unit
           {
-            SELECT_LEX *first_in_nest=
-                         $1->pre_last_parse->next_select()->first_nested;
-            if (first_in_nest->first_nested != first_in_nest)
-            {
-              /* There is a priority jump starting from first_in_nest */
-              if (Lex->create_priority_nest(first_in_nest) == NULL)
+            if (Lex->parsed_body_unit($1))
                 MYSQL_YYABORT;
-            }
-            Lex->push_select($1->fake_select_lex);
           }
           query_expression_tail
           {
-            Lex->pop_select();
-            if ($3)
-            {
-              ($3)->set_to($1->fake_select_lex);
-            }
-            $$= $1;
+            if (!($$= Lex->parsed_body_unit_tail($1, $3)))
+              YYABORT;
           }
         ;
 
@@ -9342,23 +9523,8 @@ subselect:
           remember_tok_start
           query_expression
           {
-            if (!Lex->expr_allows_subselect ||
-                Lex->sql_command == (int)SQLCOM_PURGE)
-            {
-              thd->parse_error(ER_SYNTAX_ERROR, $1);
-              MYSQL_YYABORT;
-            }
-
-            // Add the subtree of subquery to the current SELECT_LEX
-            SELECT_LEX *curr_sel= Lex->select_stack_head();
-            DBUG_ASSERT(Lex->current_select == curr_sel);
-            if (curr_sel)
-            {
-              curr_sel->register_unit($2, &curr_sel->context);
-              curr_sel->add_statistics($2);
-            }
-
-            $$= $2->first_select();
+            if (!($$= Lex->parsed_subselect($2, $1)))
+              YYABORT;
           }
         ;
 
@@ -12054,61 +12220,15 @@ table_primary_ident:
 table_primary_derived:
           query_primary_parens opt_for_system_time_clause table_alias_clause
           {
-            LEX *lex=Lex;
-            lex->derived_tables|= DERIVED_SUBQUERY;
-            $1->linkage= DERIVED_TABLE_TYPE;
-            $1->braces= FALSE;
-            // Add the subtree of subquery to the current SELECT_LEX
-            SELECT_LEX *curr_sel= Lex->select_stack_head();
-            DBUG_ASSERT(Lex->current_select == curr_sel);
-            SELECT_LEX_UNIT *unit= $1->master_unit();
-            if (!unit)
-            {
-              unit= Lex->create_unit($1);
-              if (!unit)
-                YYABORT;
-            }
-            curr_sel->register_unit(unit, &curr_sel->context);
-            curr_sel->add_statistics(unit);
-
-            Table_ident *ti= new (thd->mem_root) Table_ident(unit);
-            if (unlikely(ti == NULL))
-              MYSQL_YYABORT;
-            if (!($$= curr_sel->add_table_to_list(lex->thd,
-                                                  ti, $3, 0,
-                                                  TL_READ, MDL_SHARED_READ)))
-              MYSQL_YYABORT;
-            if ($2)
-            {
-              $$->vers_conditions= Lex->vers_conditions;
-            }
+            if (!($$= Lex->parsed_derived_select($1, $2, $3)))
+              YYABORT;
           }
         | '('
           query_expression
           ')' opt_for_system_time_clause table_alias_clause
           {
-            LEX *lex=Lex;
-            lex->derived_tables|= DERIVED_SUBQUERY;
-            $2->first_select()->linkage= DERIVED_TABLE_TYPE;
-
-
-            // Add the subtree of subquery to the current SELECT_LEX
-            SELECT_LEX *curr_sel= Lex->select_stack_head();
-            DBUG_ASSERT(Lex->current_select == curr_sel);
-            curr_sel->register_unit($2, &curr_sel->context);
-            curr_sel->add_statistics($2);
-
-            Table_ident *ti= new (thd->mem_root) Table_ident($2);
-            if (ti == NULL)
-              MYSQL_YYABORT;
-            if (!($$= curr_sel->add_table_to_list(lex->thd,
-                                                  ti, $5, 0,
-                                                  TL_READ, MDL_SHARED_READ)))
-              MYSQL_YYABORT;
-            if ($4)
-            {
-              $$->vers_conditions= Lex->vers_conditions;
-            }
+            if (!($$= Lex->parsed_derived_unit($2, $4, $5)))
+              YYABORT;
           }
         ;
 
@@ -17334,22 +17454,8 @@ view_select:
           query_expression
           view_check_option
           {
-            LEX *lex= Lex;
-            SQL_I_List<TABLE_LIST> *save= &lex->first_select_lex()->table_list;
-            lex->set_main_unit($2);
-            if (lex->check_main_unit_semantics())
+            if (Lex->parsed_create_view($2, $3))
               MYSQL_YYABORT;
-            lex->first_select_lex()->table_list.push_front(save);
-            lex->current_select= Lex->first_select_lex();
-            size_t len= YYLIP->get_cpp_ptr() - lex->create_view->select.str;
-            void *create_view_select= thd->memdup(lex->create_view->select.str, len);
-            lex->create_view->select.length= len;
-            lex->create_view->select.str= (char *) create_view_select;
-            size_t not_used;
-            trim_whitespace(thd->charset(),
-                            &lex->create_view->select, &not_used);
-            lex->create_view->check= $3;
-            lex->parsing_options.allows_variable= TRUE;
           }
         ;
 

@@ -4213,6 +4213,37 @@ public:
     builtin_select.exclude_from_global();
   }
   bool check_main_unit_semantics();
+
+  // reaction on different parsed parts (bodies are in sql_yacc.yy)
+  bool parsed_unit_in_brackets(SELECT_LEX_UNIT *unit);
+  SELECT_LEX *parsed_select(SELECT_LEX *sel, Lex_order_limit_lock * l);
+  SELECT_LEX *parsed_unit_in_brackets_tail(SELECT_LEX_UNIT *unit,
+                                           Lex_order_limit_lock * l);
+  SELECT_LEX *parsed_select_in_brackets(SELECT_LEX *sel,
+                                             Lex_order_limit_lock * l);
+  SELECT_LEX_UNIT *parsed_select_expr_start(SELECT_LEX *s1, SELECT_LEX *s2,
+                                            enum sub_select_type unit_type,
+                                            bool distinct);
+  SELECT_LEX_UNIT *parsed_select_expr_cont(SELECT_LEX_UNIT *unit,
+                                           SELECT_LEX *s2,
+                                           enum sub_select_type unit_type,
+                                           bool distinct);
+  SELECT_LEX_UNIT *parsed_body_select(SELECT_LEX *sel,
+                                      Lex_order_limit_lock * l);
+  bool parsed_body_unit(SELECT_LEX_UNIT *unit);
+  SELECT_LEX_UNIT *parsed_body_unit_tail(SELECT_LEX_UNIT *unit,
+                                         Lex_order_limit_lock * l);
+  SELECT_LEX *parsed_subselect(SELECT_LEX_UNIT *unit, char *place);
+  bool parsed_insert_select(SELECT_LEX *firs_select);
+  bool parsed_TVC_start();
+  SELECT_LEX *parsed_TVC_end();
+  TABLE_LIST *parsed_derived_select(SELECT_LEX *sel, int for_system_time,
+                                    LEX_CSTRING *alias);
+  TABLE_LIST *parsed_derived_unit(SELECT_LEX_UNIT *unit,
+                                  int for_system_time,
+                                  LEX_CSTRING *alias);
+  bool parsed_create_view(SELECT_LEX_UNIT *unit, int check);
+
 };
 
 
