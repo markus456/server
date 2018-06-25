@@ -3540,7 +3540,13 @@ row_truncate_table_for_mysql(
 			fil_space_release(space);
 		}
 
-		buf_LRU_drop_page_hash_for_tablespace(table);
+		while (buf_LRU_drop_page_hash_for_tablespace(table)) {
+			if (trx_is_interrupted(trx)
+			    || srv_shutdown_state != SRV_SHUTDOWN_NONE) {
+				err = DB_INTERRUPTED;
+				goto funct_exit;
+			}
+		}
 
 		if (flags != ULINT_UNDEFINED
 		    && fil_discard_tablespace(space_id) == DB_SUCCESS) {
