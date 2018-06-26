@@ -2703,7 +2703,7 @@ os_file_create_simple_func(
 	bool	retry;
 
 	do {
-		file = open(name, create_flag, os_innodb_umask);
+		file = open(name, create_flag | O_CLOEXEC, os_innodb_umask);
 
 		if (file == -1) {
 			*success = false;
@@ -3005,7 +3005,7 @@ os_file_create_func(
 	bool		retry;
 
 	do {
-		file = open(name, create_flag, os_innodb_umask);
+		file = open(name, create_flag | O_CLOEXEC, os_innodb_umask);
 
 		if (file == -1) {
 			const char*	operation;
@@ -3139,7 +3139,7 @@ os_file_create_simple_no_error_handling_func(
 		return(OS_FILE_CLOSED);
 	}
 
-	file = open(name, create_flag, os_innodb_umask);
+	file = open(name, create_flag | O_CLOEXEC, os_innodb_umask);
 
 	*success = (file != -1);
 

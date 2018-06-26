@@ -3434,6 +3434,14 @@ open_and_process_table(THD *thd, LEX *lex, TABLE_LIST *tables,
   /*
     Not a placeholder: must be a base/temporary table or a view. Let us open it.
   */
+
+  if (tables->db.str == no_db)
+  {
+    my_message(ER_NO_DB_ERROR, ER(ER_NO_DB_ERROR), MYF(0));
+    error= TRUE;
+    goto end;
+  }
+
   if (tables->table)
   {
     /*
@@ -5601,6 +5609,9 @@ find_field_in_natural_join(THD *thd, TABLE_LIST *table_ref, const char *name, si
       column reference. See create_view_field() for details.
     */
     item= nj_col->create_item(thd);
+    if (!item)
+      DBUG_RETURN(NULL);
+
     /*
      *ref != NULL means that *ref contains the item that we need to
      replace. If the item was aliased by the user, set the alias to
