@@ -1485,6 +1485,7 @@ public:
     if (d && master_unit() && master_unit()->union_distinct != this)
       master_unit()->union_distinct= this;
     distinct= d;
+    with_all_modifier= !distinct;
     DBUG_VOID_RETURN;
   }
   bool set_nest_level(int new_nest_level);
