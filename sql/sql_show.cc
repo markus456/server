@@ -10340,7 +10340,7 @@ char *thd_get_error_context_description(THD *thd, char *buffer,
   String str(buffer, length, &my_charset_latin1);
   const Security_context *sctx= &thd->main_security_ctx;
   char header[256];
-  int len;
+  size_t len;
 
   len= my_snprintf(header, sizeof(header),
                    "MySQL thread id %u, OS thread handle %lu, query id %llu",

@@ -3527,7 +3527,7 @@ row_drop_table_for_mysql(
 	ut_ad(!(table->stats_bg_flag & BG_STAT_IN_PROGRESS));
 
 	if (!table->no_rollback()) {
-		if (table->space != TRX_SYS_SPACE) {
+		if (table->space->id != TRX_SYS_SPACE) {
 			/* On DISCARD TABLESPACE, we would not drop the
 			adaptive hash index entries. If the tablespace is
 			missing here, delete-marking the record in SYS_INDEXES
