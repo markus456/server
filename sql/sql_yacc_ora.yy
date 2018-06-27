@@ -9234,7 +9234,7 @@ query_expression_unit:
           query_primary
           {
             if (!($$= Lex->parsed_select_expr_cont($1, $3, $2.unit_type,
-                                                   $2.distinct)))
+                                                   $2.distinct, TRUE)))
               YYABORT;
           }
         ;

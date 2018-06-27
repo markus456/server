@@ -4228,7 +4228,7 @@ public:
   SELECT_LEX_UNIT *parsed_select_expr_cont(SELECT_LEX_UNIT *unit,
                                            SELECT_LEX *s2,
                                            enum sub_select_type unit_type,
-                                           bool distinct);
+                                           bool distinct, bool oracle);
   SELECT_LEX_UNIT *parsed_body_select(SELECT_LEX *sel,
                                       Lex_order_limit_lock * l);
   bool parsed_body_unit(SELECT_LEX_UNIT *unit);

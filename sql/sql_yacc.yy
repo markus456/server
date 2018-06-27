@@ -809,7 +809,7 @@ SELECT_LEX_UNIT *LEX::parsed_select_expr_start(SELECT_LEX *s1, SELECT_LEX *s2,
 SELECT_LEX_UNIT *LEX::parsed_select_expr_cont(SELECT_LEX_UNIT *unit,
                                               SELECT_LEX *s2,
                                               enum sub_select_type unit_type,
-                                              bool distinct)
+                                              bool distinct, bool oracle)
 {
   SELECT_LEX *sel1;
   if (!s2->next_select())
@@ -822,7 +822,7 @@ SELECT_LEX_UNIT *LEX::parsed_select_expr_cont(SELECT_LEX_UNIT *unit,
   }
   SELECT_LEX *last= unit->pre_last_parse->next_select();
 
-  int cmp= cmp_unit_op(unit_type, last->linkage);
+  int cmp= oracle? 0 : cmp_unit_op(unit_type, last->linkage);
   if (cmp == 0)
   {
     sel1->first_nested= last->first_nested;
@@ -9478,7 +9478,7 @@ query_expression_unit:
           query_primary
           {
             if (!($$= Lex->parsed_select_expr_cont($1, $3, $2.unit_type,
-                                                   $2.distinct)))
+                                                   $2.distinct, FALSE)))
               YYABORT;
           }
         ;
