@@ -497,7 +497,7 @@ a
 1
 1
 (select 1 from dual into @v) intersect (select 1 from dual);
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'into @v) intersect (select 1 from dual)' at line 1
 select 1 from dual ORDER BY 1 intersect select 1 from dual;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'intersect select 1 from dual' at line 1
 select 1 as a from dual union all select 1 from dual;

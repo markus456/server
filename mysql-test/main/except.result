@@ -500,7 +500,7 @@ a
 (select 1 from dual) except (select 1 from dual);
 1
 (select 1 from dual into @v) except (select 1 from dual);
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'into @v) except (select 1 from dual)' at line 1
 select 1 from dual ORDER BY 1 except select 1 from dual;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'except select 1 from dual' at line 1
 select 1 as a from dual union all select 1 from dual;

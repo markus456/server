@@ -919,12 +919,12 @@ select * from v4;
 ERROR 21000: Subquery returns more than 1 row
 drop view v4, v3, v2, v1;
 create view v1 as select 5 into @w;
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'into @w' at line 1
 create view v1 as select 5 into outfile 'ttt';
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'into outfile 'ttt'' at line 1
 create table t1 (a int);
 create view v1 as select a from t1 procedure analyse();
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'procedure analyse()' at line 1
 create view v1 as select 1 from (select 1) as d1;
 drop view v1;
 drop table t1;
@@ -2443,6 +2443,8 @@ SELECT Meaning FROM v1 INTO retn;
 RETURN retn;
 END
 //
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 CREATE VIEW v2 AS SELECT f1();
 select * from v2;
 f1()
@@ -2614,6 +2616,8 @@ declare mx int;
 select max(a) from t1 into mx;
 return mx;
 end//
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 create view v1 as select f1() as a;
 create view v2 as select * from v1;
 drop table t1;
@@ -3152,10 +3156,14 @@ DROP VIEW v1;
 DROP TABLE t1;
 DROP VIEW IF EXISTS v1;
 SELECT * FROM (SELECT 1) AS t into @w;
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 CREATE VIEW v1 AS SELECT * FROM (SELECT 1) AS t into @w;
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'into @w' at line 1
 # Previously the following would fail.
 SELECT * FROM (SELECT 1) AS t into @w;
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 drop view if exists view_24532_a;
 drop view if exists view_24532_b;
 drop table if exists table_24532;
@@ -3952,6 +3960,8 @@ BEGIN
 SELECT a FROM v2 INTO @a;
 RETURN @a;
 END//
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Trigger pre-locking when opening v2.
 CREATE VIEW v1 AS SELECT f1() FROM t1;
 SHOW CREATE VIEW v1;

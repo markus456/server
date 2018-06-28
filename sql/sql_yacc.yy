@@ -1059,6 +1059,15 @@ bool LEX::parsed_create_view(SELECT_LEX_UNIT *unit, int check)
   return false;
 }
 
+bool LEX::select_finalize(st_select_lex_unit *expr)
+{
+  sql_command= SQLCOM_SELECT;
+  selects_allow_into= TRUE;
+  selects_allow_procedure= TRUE;
+  set_main_unit(expr);
+  return check_main_unit_semantics();
+}
+
 %}
 %union {
   int  num;
@@ -2316,8 +2325,11 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
         simple_table
         query_primary
         query_primary_parens
+        select_into_query_specification
+
 
 %type <select_lex_unit>
+        query_specification_start
         query_expression_body
         query_expression
         query_expression_unit
@@ -2336,7 +2348,6 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %type <unit_operation> unit_type_decl
 
 %type <select_lock>
-        opt_select_lock_type
         select_lock_type
         opt_lock_wait_timeout_new
 
@@ -2345,12 +2356,14 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %type <order_limit_lock>
         query_expression_tail
         order_or_limit
+        opt_order_limit_lock
 
 %type <select_order> opt_order_clause order_clause order_list
 
 %type <NONE>
         analyze_stmt_command
-        query verb_clause create change select do drop insert replace insert2
+        query verb_clause create change select select_into
+        do drop insert replace insert2
         insert_values update delete truncate rename compound_statement
         show describe load alter optimize keycache preload flush
         reset purge begin commit rollback savepoint release
@@ -2611,6 +2624,7 @@ statement:
         | rollback
         | savepoint
         | select
+        | select_into
         | set
         | signal_stmt
         | show
@@ -9369,17 +9383,52 @@ opt_ignore_leaves:
 */
 
 select:
-          query_expression
+          query_expression_body
           {
-            Lex->selects_allow_into= TRUE;
-            Lex->selects_allow_procedure= TRUE;
-            Lex->set_main_unit($1);
-            if (Lex->check_main_unit_semantics())
+            if (Lex->push_select($1->fake_select_lex ?
+                                 $1->fake_select_lex :
+                                 $1->first_select()))
               MYSQL_YYABORT;
-
-            Lex->sql_command= SQLCOM_SELECT;
+          }
+          opt_procedure_or_into
+          {
+            Lex->pop_select();
+            if (Lex->select_finalize($1))
+              MYSQL_YYABORT;
+          }
+        | with_clause query_expression_body
+          {
+            if (Lex->push_select($2->fake_select_lex ?
+                                 $2->fake_select_lex :
+                                 $2->first_select()))
+              MYSQL_YYABORT;
+          }
+          opt_procedure_or_into
+          {
+            Lex->pop_select();
+            $2->set_with_clause($1);
+            $1->attach_to($2->first_select());
+            if (Lex->select_finalize($2))
+              MYSQL_YYABORT;
           }
         ;
+
+
+select_into:
+          select_into_query_specification
+          {
+            if (Lex->push_select($1))
+              MYSQL_YYABORT;
+          }
+          opt_order_limit_lock
+          {
+            st_select_lex_unit *unit;
+            if (!(unit= Lex->parsed_body_select($1, $3)))
+              MYSQL_YYABORT;
+            if (Lex->select_finalize(unit))
+              MYSQL_YYABORT;
+           }
+         ;
 
 
 simple_table:
@@ -9400,7 +9449,7 @@ table_value_constructor:
 	  }
 	;
 
-query_specification:
+query_specification_start:
           SELECT_SYM
           {
             SELECT_LEX *sel;
@@ -9419,7 +9468,23 @@ query_specification:
           {
             Select->parsing_place= NO_MATTER;
           }
-          opt_into
+          ;
+
+query_specification:
+          query_specification_start
+          opt_from_clause
+          opt_where_clause
+          opt_group_clause
+          opt_having_clause
+          opt_window_clause
+          {
+            $$= Lex->pop_select();
+          }
+        ;
+
+select_into_query_specification:
+          query_specification_start
+          into
           opt_from_clause
           opt_where_clause
           opt_group_clause
@@ -9491,17 +9556,17 @@ query_expression_body:
           query_expression_tail
           {
             if (!($$= Lex->parsed_body_select($1, $3)))
-              YYABORT;
+              MYSQL_YYABORT;
           }
         | query_expression_unit
           {
             if (Lex->parsed_body_unit($1))
-                MYSQL_YYABORT;
+              MYSQL_YYABORT;
           }
           query_expression_tail
           {
             if (!($$= Lex->parsed_body_unit_tail($1, $3)))
-              YYABORT;
+              MYSQL_YYABORT;
           }
         ;
 
@@ -9652,12 +9717,6 @@ select_option:
           }
         ;
 
-opt_select_lock_type:
-          /* empty */
-          { $$.empty(); }
-        | select_lock_type
-          { $$= $1; }
-        ;
 
 select_lock_type:
           FOR_SYM UPDATE_SYM opt_lock_wait_timeout_new
@@ -12822,25 +12881,17 @@ delete_limit_clause:
        | LIMIT limit_option ROWS_SYM EXAMINED_SYM { thd->parse_error(); MYSQL_YYABORT; }
         ;
 
-query_expression_tail:
-          /* empty */ { $$= NULL; }
-        | order_or_limit opt_select_lock_type
+opt_order_limit_lock:
+          /* empty */ 
+          { $$= NULL; }
+        | order_or_limit
           {
             $$= $1;
-            $$->lock= $2;
+            $$->lock.empty();
           }
-        | order_or_limit procedure_or_into opt_select_lock_type
+        | order_or_limit select_lock_type
           {
             $$= $1;
-            $$->lock= $3;
-          }
-        | procedure_or_into opt_select_lock_type
-          {
-            $$= new(thd->mem_root) Lex_order_limit_lock;
-            if (!$$)
-              YYABORT;
-            $$->order_list= NULL;
-            $$->limit.empty();
             $$->lock= $2;
           }
         | select_lock_type
@@ -12853,12 +12904,33 @@ query_expression_tail:
             $$->lock= $1;
           }
         ;
-
-procedure_or_into:
-          procedure_clause
-        | into
-        | procedure_clause into
+query_expression_tail:
+          opt_order_limit_lock
         ;
+
+opt_procedure_or_into:
+          /* empty */ 
+        | procedure_clause
+        | into
+        {
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                              ER_WARN_DEPRECATED_SYNTAX,
+                              ER_THD(thd, ER_WARN_DEPRECATED_SYNTAX),
+                              "<select expression> INTO <destination>;",
+                              "'SELECT <select list> INTO <destination>"
+                              " FROM...'");
+        }
+        | procedure_clause into
+        {
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                              ER_WARN_DEPRECATED_SYNTAX,
+                              ER_THD(thd, ER_WARN_DEPRECATED_SYNTAX),
+                              "<select expression> INTO <destination>;",
+                              "'SELECT <select list> INTO <destination>"
+                              " FROM...'");
+        }
+        ;
+
 
 order_or_limit:
           order_clause opt_limit_clause
@@ -13057,10 +13129,16 @@ select_outvar:
           }
         ;
 
+/*
 opt_into:
+*/
           /* empty */
+/*
         | into
         ;
+*/
+
+
 into:
           INTO into_destination
           {
@@ -14380,6 +14458,7 @@ describe:
 
 explainable_command:
           select
+        | select_into
         | insert
         | replace
         | update

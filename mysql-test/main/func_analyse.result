@@ -19,7 +19,7 @@ test.t1.empty_string			0	0	4	0	0.0000	NULL	CHAR(0) NOT NULL
 test.t1.bool	N	Y	1	1	0	0	1.0000	NULL	ENUM('N','Y') NOT NULL
 test.t1.d	2002-03-03	2002-03-05	10	10	0	0	10.0000	NULL	ENUM('2002-03-03','2002-03-04','2002-03-05') NOT NULL
 create table t2 select * from t1 procedure analyse();
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'procedure analyse()' at line 1
 drop table t1;
 EXPLAIN SELECT 1 FROM (SELECT 1) a PROCEDURE ANALYSE();
 ERROR HY000: Incorrect usage of PROCEDURE and subquery
@@ -120,7 +120,7 @@ CREATE TABLE t1(a INT);
 INSERT INTO t1 VALUES (1),(2);
 # should not crash
 CREATE TABLE t2 SELECT 1 FROM t1, t1 t3 GROUP BY t3.a PROCEDURE ANALYSE();
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE()' at line 1
 DROP TABLE t1;
 End of 5.0 tests
 #
@@ -153,11 +153,9 @@ End of 5.1 tests
 # Start of 10.2 tests
 #
 (SELECT 1 FROM DUAL PROCEDURE ANALYSE());
-Field_name	Min_value	Max_value	Min_length	Max_length	Empties_or_zeros	Nulls	Avg_value_or_avg_length	Std	Optimal_fieldtype
-1	1	1	1	1	0	0	1.0000	0.0000	ENUM('1') NOT NULL
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE())' at line 1
 ((SELECT 1 FROM DUAL PROCEDURE ANALYSE()));
-Field_name	Min_value	Max_value	Min_length	Max_length	Empties_or_zeros	Nulls	Avg_value_or_avg_length	Std	Optimal_fieldtype
-1	1	1	1	1	0	0	1.0000	0.0000	ENUM('1') NOT NULL
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE()))' at line 1
 (SELECT 1 FROM DUAL) PROCEDURE ANALYSE();
 Field_name	Min_value	Max_value	Min_length	Max_length	Empties_or_zeros	Nulls	Avg_value_or_avg_length	Std	Optimal_fieldtype
 1	1	1	1	1	0	0	1.0000	0.0000	ENUM('1') NOT NULL
@@ -172,13 +170,13 @@ drop table t1;
 # MDEV-10030 sql_yacc.yy: Split table_expression and remove PROCEDURE from create_select, select_paren_derived, select_derived2, query_specification
 #
 SELECT * FROM (SELECT * FROM t1 PROCEDURE ANALYSE());
-ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '' at line 1
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE())' at line 1
 SELECT * FROM t1 NATURAL JOIN (SELECT * FROM t2 PROCEDURE ANALYSE());
-ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '' at line 1
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE())' at line 1
 SELECT (SELECT 1 FROM t1 PROCEDURE ANALYSE()) FROM t2;
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE()) FROM t2' at line 1
 SELECT ((SELECT 1 FROM t1 PROCEDURE ANALYSE())) FROM t2;
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE())) FROM t2' at line 1
 #
 # Start of 10.4 tests
 #

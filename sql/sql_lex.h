@@ -4244,7 +4244,7 @@ public:
                                   int for_system_time,
                                   LEX_CSTRING *alias);
   bool parsed_create_view(SELECT_LEX_UNIT *unit, int check);
-
+  bool select_finalize(st_select_lex_unit *expr);
 };
 
 
