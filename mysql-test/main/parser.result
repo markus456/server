@@ -718,7 +718,7 @@ FOR UPDATE) a;
 SELECT 1 FROM
 (SELECT 1 FROM DUAL WHERE 1 GROUP BY 1 HAVING 1 ORDER BY 1
 PROCEDURE ANALYSE() FOR UPDATE) a;
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE() FOR UPDATE) a' at line 3
 SELECT 1 FROM t1
 WHERE EXISTS(SELECT 1 FROM DUAL WHERE 1 GROUP BY 1 HAVING 1 ORDER BY 1
 FOR UPDATE);
@@ -726,7 +726,7 @@ FOR UPDATE);
 SELECT 1 FROM t1
 WHERE EXISTS(SELECT 1 FROM DUAL WHERE 1 GROUP BY 1 HAVING 1 ORDER BY 1
 PROCEDURE ANALYSE() FOR UPDATE);
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE() FOR UPDATE)' at line 3
 SELECT 1 FROM t1
 UNION
 SELECT 1 FROM DUAL WHERE 1 GROUP BY 1 HAVING 1 ORDER BY 1
@@ -753,7 +753,7 @@ FOR UPDATE);
 UNION 
 (SELECT 1 FROM DUAL WHERE 1 GROUP BY 1 HAVING 1 ORDER BY 1
 PROCEDURE ANALYSE() FOR UPDATE);
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE() FOR UPDATE)' at line 4
 # "FOR UPDATE" tests
 SELECT 1 FROM t1 UNION SELECT 1 FROM t1 ORDER BY 1 LIMIT 1;
 1
@@ -764,45 +764,50 @@ SELECT 1 FROM t1 UNION SELECT 1 FROM t1 ORDER BY 1 LIMIT 1 FOR UPDATE;
 # "INTO" clause tests
 SELECT 1 FROM t1 INTO @var17727401;
 Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 Warning	1329	No data - zero rows fetched, selected, or processed
 SELECT 1 FROM DUAL INTO @var17727401;
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 SELECT 1 INTO @var17727401;
 SELECT 1 INTO @var17727401 FROM t1;
 Warnings:
 Warning	1329	No data - zero rows fetched, selected, or processed
 SELECT 1 INTO @var17727401 FROM DUAL;
 SELECT 1 INTO @var17727401_1 FROM t1 INTO @var17727401_2;
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO @var17727401_2' at line 1
 SELECT 1 INTO @var17727401_1 FROM DUAL
 INTO @var17727401_2;
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO @var17727401_2' at line 2
 SELECT 1 INTO @var17727401 FROM t1 WHERE 1 GROUP BY 1 HAVING 1 ORDER BY 1 LIMIT 1;
 Warnings:
 Warning	1329	No data - zero rows fetched, selected, or processed
 SELECT 1 FROM t1 WHERE 1 GROUP BY 1 HAVING 1 ORDER BY 1 LIMIT 1 INTO @var17727401;
 Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 Warning	1329	No data - zero rows fetched, selected, or processed
 SELECT 1 FROM t1 WHERE 1 INTO @var17727401 GROUP BY 1 HAVING 1 ORDER BY 1 LIMIT 1;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'GROUP BY 1 HAVING 1 ORDER BY 1 LIMIT 1' at line 1
 SELECT 1 INTO @var17727401_1
 FROM t1 WHERE 1 GROUP BY 1 HAVING 1 ORDER BY 1 LIMIT 1
 INTO @var17727401_2;
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO @var17727401_2' at line 3
 SELECT (SELECT 1 FROM t1 INTO @var17727401);
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO @var17727401)' at line 1
 SELECT 1 FROM (SELECT 1 FROM t1 INTO @var17727401) a;
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO @var17727401) a' at line 1
 SELECT EXISTS(SELECT 1 FROM t1 INTO @var17727401);
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO @var17727401)' at line 1
 SELECT 1 FROM t1 INTO @var17727401 UNION SELECT 1 FROM t1 INTO t1;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'UNION SELECT 1 FROM t1 INTO t1' at line 1
 (SELECT 1 FROM t1 INTO @var17727401) UNION (SELECT 1 FROM t1 INTO t1);
-ERROR 42000: Undeclared variable: t1
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO @var17727401) UNION (SELECT 1 FROM t1 INTO t1)' at line 1
 SELECT 1 FROM t1 UNION SELECT 1 FROM t1 INTO @var17727401;
 Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 Warning	1329	No data - zero rows fetched, selected, or processed
 SELECT 1 INTO @var17727401 FROM t1 PROCEDURE ANALYSE();
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE()' at line 1
 SELECT 1 FROM t1 PROCEDURE ANALYSE() INTO @var17727401;
 ERROR 42000: Incorrect usage/placement of 'INTO'
 # ORDER and LIMIT clause combinations
@@ -1256,19 +1261,27 @@ CREATE TABLE t1 (i INT);
 (SELECT * FROM t1 PROCEDURE ANALYSE(10, 10))
 UNION
 (SELECT * FROM t1 PROCEDURE ANALYSE(10, 10));
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE(10, 10))
+UNION
+(SELECT * FROM t1 PROCEDURE ANALYSE(10, 10))' at line 1
 (SELECT * FROM t1 PROCEDURE ANALYSE(10, 10))
 UNION
 SELECT * FROM t1 PROCEDURE ANALYSE(10, 10);
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE(10, 10))
+UNION
+SELECT * FROM t1 PROCEDURE ANALYSE(10, 10)' at line 1
 (SELECT * FROM t1 PROCEDURE ANALYSE(10, 10))
 UNION
 (SELECT 1);
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE(10, 10))
+UNION
+(SELECT 1)' at line 1
 (SELECT * FROM t1 PROCEDURE ANALYSE(10, 10))
 UNION
 SELECT 1;
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE(10, 10))
+UNION
+SELECT 1' at line 1
 SELECT * FROM t1 PROCEDURE ANALYSE(10, 10)
 UNION
 (SELECT * FROM t1 PROCEDURE ANALYSE(10, 10));

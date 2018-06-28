@@ -1,5 +1,7 @@
 drop table if exists t1, t2;
 SELECT * FROM mysql.proc INTO OUTFILE 'MYSQLTEST_VARDIR/tmp/proc.txt';
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 delete from mysql.proc;
 create procedure syntaxerror(t int)|
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '' at line 1
@@ -12,6 +14,8 @@ create table t3 ( x int )|
 insert into t3 values (2), (3)|
 create procedure bad_into(out param int)
 select x from t3 into param|
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 call bad_into(@x)|
 ERROR 42000: Result consisted of more than one row
 drop procedure bad_into|
@@ -1221,16 +1225,16 @@ DROP PROCEDURE IF EXISTS bug14702;
 DROP TABLE IF EXISTS t1;
 CREATE TABLE t1 (i INT);
 CREATE PROCEDURE bug20953() CREATE VIEW v AS SELECT 1 INTO @a;
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO @a' at line 1
 CREATE PROCEDURE bug20953() CREATE VIEW v AS SELECT 1 INTO DUMPFILE "file";
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO DUMPFILE "file"' at line 1
 CREATE PROCEDURE bug20953() CREATE VIEW v AS SELECT 1 INTO OUTFILE "file";
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INTO OUTFILE "file"' at line 1
 CREATE PROCEDURE bug20953()
 CREATE VIEW v AS SELECT i FROM t1 PROCEDURE ANALYSE();
-ERROR 42000: Incorrect usage/placement of 'PROCEDURE'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'PROCEDURE ANALYSE()' at line 2
 CREATE PROCEDURE bug20953() CREATE VIEW v AS SELECT 1 FROM (SELECT 1) AS d1 into @w;
-ERROR 42000: Incorrect usage/placement of 'INTO'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'into @w' at line 1
 CREATE PROCEDURE bug20953(i INT) CREATE VIEW v AS SELECT i;
 ERROR HY000: View's SELECT contains a variable or parameter
 CREATE PROCEDURE bug20953()
@@ -2842,6 +2846,8 @@ DECLARE v VARCHAR(5) DEFAULT -1;
 SELECT b FROM t1 WHERE a = 2 INTO v;
 RETURN v;
 END|
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 
 # Here we check that the NOT_FOUND condition raised in f1()
 # is not visible in the outer function (f2), i.e. the continue

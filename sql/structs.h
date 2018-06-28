@@ -754,6 +754,8 @@ public:
 };
 
 
+class st_select_lex;
+
 class Lex_select_lock
 {
 public:
@@ -771,6 +773,7 @@ public:
     defined_lock= update_lock= defined_timeout= FALSE;
     timeout= 0;
   }
+  void set_to(st_select_lex *sel);
 };
 
 class Lex_select_limit
@@ -787,7 +790,6 @@ public:
 };
 
 struct st_order;
-class st_select_lex;
 
 /**
   ORDER BY ... LIMIT parameters;

@@ -1068,6 +1068,26 @@ bool LEX::select_finalize(st_select_lex_unit *expr)
   return check_main_unit_semantics();
 }
 
+bool LEX::set_lock_to_the_last_select(SELECT_LEX_UNIT *unit,
+                                      Lex_select_lock l)
+{
+  if (l.defined_lock)
+  {
+    SELECT_LEX *sel= unit->first_select();
+    while (sel->next_select())
+      sel= sel->next_select();
+    if (sel->braces)
+    {
+      my_error(ER_WRONG_USAGE, MYF(0), "lock options",
+               "end of the SELECT statement");
+      return TRUE;
+    }
+    l.set_to(sel);
+  }
+  return FALSE;
+}
+
+
 %}
 %union {
   int  num;
@@ -2348,6 +2368,8 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %type <unit_operation> unit_type_decl
 
 %type <select_lock>
+        opt_procedure_or_into
+        opt_select_lock_type
         select_lock_type
         opt_lock_wait_timeout_new
 
@@ -9393,6 +9415,8 @@ select:
           opt_procedure_or_into
           {
             Lex->pop_select();
+            if (Lex->set_lock_to_the_last_select($1, $3))
+              MYSQL_YYABORT;
             if (Lex->select_finalize($1))
               MYSQL_YYABORT;
           }
@@ -9408,6 +9432,8 @@ select:
             Lex->pop_select();
             $2->set_with_clause($1);
             $1->attach_to($2->first_select());
+            if (Lex->set_lock_to_the_last_select($2, $4))
+              MYSQL_YYABORT;
             if (Lex->select_finalize($2))
               MYSQL_YYABORT;
           }
@@ -9731,6 +9757,17 @@ select_lock_type:
             $$.defined_lock= TRUE;
             $$.update_lock= FALSE;
           }
+        ;
+
+opt_select_lock_type:
+        /* empty */
+        {
+          $$.empty();
+        }
+        | select_lock_type
+        {
+          $$= $1;
+        }
         ;
 
 opt_lock_wait_timeout_new:
@@ -12910,17 +12947,14 @@ query_expression_tail:
 
 opt_procedure_or_into:
           /* empty */ 
-        | procedure_clause
-        | into
         {
-          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                              ER_WARN_DEPRECATED_SYNTAX,
-                              ER_THD(thd, ER_WARN_DEPRECATED_SYNTAX),
-                              "<select expression> INTO <destination>;",
-                              "'SELECT <select list> INTO <destination>"
-                              " FROM...'");
+          $$.empty();
         }
-        | procedure_clause into
+        | procedure_clause opt_select_lock_type
+        {
+          $$= $2;
+        }
+        | into opt_select_lock_type
         {
           push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
                               ER_WARN_DEPRECATED_SYNTAX,
@@ -12928,6 +12962,27 @@ opt_procedure_or_into:
                               "<select expression> INTO <destination>;",
                               "'SELECT <select list> INTO <destination>"
                               " FROM...'");
+          $$= $2;
+        }
+        | procedure_clause into opt_select_lock_type
+        {
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                              ER_WARN_DEPRECATED_SYNTAX,
+                              ER_THD(thd, ER_WARN_DEPRECATED_SYNTAX),
+                              "<select expression> INTO <destination>;",
+                              "'SELECT <select list> INTO <destination>"
+                              " FROM...'");
+          $$= $3;
+        }
+        | procedure_clause select_lock_type into
+        {
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                              ER_WARN_DEPRECATED_SYNTAX,
+                              ER_THD(thd, ER_WARN_DEPRECATED_SYNTAX),
+                              "<select expression> INTO <destination>;",
+                              "'SELECT <select list> INTO <destination>"
+                              " FROM...'");
+          $$= $2;
         }
         ;
 

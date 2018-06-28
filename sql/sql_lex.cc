@@ -8847,6 +8847,24 @@ bool LEX::main_select_push()
   DBUG_RETURN(FALSE);
 }
 
+void Lex_select_lock::set_to(SELECT_LEX *sel)
+{
+  if (defined_lock)
+  {
+    sel->parent_lex->safe_to_cache_query= 0;
+    if (update_lock)
+    {
+      sel->lock_type= TL_WRITE;
+      sel->set_lock_for_tables(TL_WRITE);
+    }
+    else
+    {
+      sel->lock_type= TL_READ_WITH_SHARED_LOCKS;
+      sel->set_lock_for_tables(TL_READ_WITH_SHARED_LOCKS);
+    }
+  }
+}
+
 bool Lex_order_limit_lock::set_to(SELECT_LEX *sel)
 {
   /*TODO: lock */
@@ -8863,20 +8881,7 @@ bool Lex_order_limit_lock::set_to(SELECT_LEX *sel)
                                      lock.timeout))
        return TRUE;
   }
-  if (lock.defined_lock)
-  {
-    sel->parent_lex->safe_to_cache_query= 0;
-    if (lock.update_lock)
-    {
-      sel->lock_type= TL_WRITE;
-      sel->set_lock_for_tables(TL_WRITE);
-    }
-    else
-    {
-      sel->lock_type= TL_READ_WITH_SHARED_LOCKS;
-      sel->set_lock_for_tables(TL_READ_WITH_SHARED_LOCKS);
-    }
-  }
+  lock.set_to(sel);
   sel->explicit_limit= limit.explicit_limit;
   sel->select_limit= limit.select_limit;
   sel->offset_limit= limit.offset_limit;
